@@ -1,20 +1,25 @@
 import { useState } from 'react'
-import { trpc } from '../lib/trpc'
+import { login, type AuthUser } from '../lib/api'
 
-export default function Login({ onLogin }: { onLogin: () => void }) {
+export default function Login({ onLogin }: { onLogin: (user: AuthUser) => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [isPending, setIsPending] = useState(false)
 
-  const loginMutation = trpc.auth.login.useMutation({
-    onSuccess: () => onLogin(),
-    onError: (err) => setError(err.message),
-  })
-
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    loginMutation.mutate({ email, password })
+    setIsPending(true)
+
+    try {
+      const user = await login({ email, password })
+      onLogin(user)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao fazer login')
+    } finally {
+      setIsPending(false)
+    }
   }
 
   return (
@@ -63,10 +68,10 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
 
             <button
               type="submit"
-              disabled={loginMutation.isPending}
+              disabled={isPending}
               className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-semibold rounded-lg py-2.5 transition"
             >
-              {loginMutation.isPending ? 'Entrando...' : 'Entrar'}
+              {isPending ? 'Entrando...' : 'Entrar'}
             </button>
           </form>
         </div>

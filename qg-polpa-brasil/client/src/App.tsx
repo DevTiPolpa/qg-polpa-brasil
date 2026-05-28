@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react'
 import { Route, Switch } from 'wouter'
-import { trpc } from './lib/trpc'
+import { getCurrentUser, type AuthUser } from './lib/api'
 import Login from './pages/Login'
 import ChangePassword from './pages/ChangePassword'
 import DashboardLayout from './components/DashboardLayout'
@@ -18,7 +19,25 @@ import SnapshotComparativo from './pages/SnapshotComparativo'
 import HistoricoClientes from './pages/HistoricoClientes'
 
 function AppRoutes() {
-  const { data: user, isLoading, refetch } = trpc.auth.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false })
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  async function loadCurrentUser() {
+    setIsLoading(true)
+
+    try {
+      const currentUser = await getCurrentUser()
+      setUser(currentUser)
+    } catch {
+      setUser(null)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadCurrentUser()
+  }, [])
 
   if (isLoading) {
     return (
@@ -28,9 +47,11 @@ function AppRoutes() {
     )
   }
 
-  if (!user) return <Login onLogin={() => refetch()} />
+  if (!user) return <Login onLogin={(loggedUser) => setUser(loggedUser)} />
 
-  if (user.mustChangePassword) return <ChangePassword userName={user.name ?? user.email} onSuccess={() => refetch()} />
+  if (user.mustChangePassword) {
+    return <ChangePassword userName={user.name ?? user.email} onSuccess={loadCurrentUser} />
+  }
 
   return (
     <DashboardLayout user={user}>

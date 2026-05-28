@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, ShoppingBag, Package, UserCog, LogOut,
   ChevronLeft, ChevronRight, FolderOpen, TrendingUp, BarChart2, Target, Menu, X, MessageSquare, History,
 } from 'lucide-react'
-import { trpc } from '../lib/trpc'
+import { logout } from '../lib/api'
 
 const menuGroups = [
   {
@@ -50,7 +50,17 @@ export default function DashboardLayout({ children, user }: Props) {
   const [location, navigate] = useLocation()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const logoutMutation = trpc.auth.logout.useMutation({ onSuccess: () => { window.location.href = '/' } })
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  async function handleLogout() {
+    setIsLoggingOut(true)
+
+    try {
+      await logout()
+    } finally {
+      window.location.href = '/'
+    }
+  }
 
   const allGroups = user.role === 'ADMIN' ? [...menuGroups, adminMenuGroup] : menuGroups
   const initials = (user.name ?? user.email).split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
@@ -129,12 +139,13 @@ export default function DashboardLayout({ children, user }: Props) {
           </div>
         )}
         <button
-          onClick={() => logoutMutation.mutate()}
+          onClick={handleLogout}
+          disabled={isLoggingOut}
           title="Sair"
-          className={`flex items-center gap-2 w-full rounded-lg px-2 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-700 transition ${collapsed ? 'justify-center' : ''}`}
+          className={`flex items-center gap-2 w-full rounded-lg px-2 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-700 disabled:opacity-50 transition ${collapsed ? 'justify-center' : ''}`}
         >
           <LogOut size={16} />
-          {!collapsed && <span>Sair</span>}
+          {!collapsed && <span>{isLoggingOut ? 'Saindo...' : 'Sair'}</span>}
         </button>
         <button
           onClick={() => setCollapsed(c => !c)}

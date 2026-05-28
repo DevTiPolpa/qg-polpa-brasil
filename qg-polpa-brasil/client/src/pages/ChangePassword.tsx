@@ -1,26 +1,36 @@
 import { useState } from 'react'
-import { trpc } from '../lib/trpc'
+import { changePassword } from '../lib/api'
 
 export default function ChangePassword({ userName, onSuccess }: { userName: string; onSuccess: () => void }) {
   const [newPassword, setNewPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
+  const [isPending, setIsPending] = useState(false)
 
-  const utils = trpc.useUtils()
-  const changeMutation = trpc.auth.changePassword.useMutation({
-    onSuccess: async () => {
-      await utils.auth.me.invalidate()
-      onSuccess()
-    },
-    onError: (err) => setError(err.message),
-  })
-
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    if (newPassword !== confirm) { setError('As senhas não coincidem'); return }
-    if (newPassword.length < 6) { setError('A senha deve ter pelo menos 6 caracteres'); return }
-    changeMutation.mutate({ newPassword })
+
+    if (newPassword !== confirm) {
+      setError('As senhas não coincidem')
+      return
+    }
+
+    if (newPassword.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres')
+      return
+    }
+
+    setIsPending(true)
+
+    try {
+      await changePassword({ newPassword })
+      await onSuccess()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao alterar senha')
+    } finally {
+      setIsPending(false)
+    }
   }
 
   return (
@@ -68,10 +78,10 @@ export default function ChangePassword({ userName, onSuccess }: { userName: stri
 
             <button
               type="submit"
-              disabled={changeMutation.isPending}
+              disabled={isPending}
               className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-semibold rounded-lg py-2.5 transition"
             >
-              {changeMutation.isPending ? 'Salvando...' : 'Salvar nova senha'}
+              {isPending ? 'Salvando...' : 'Salvar nova senha'}
             </button>
           </form>
         </div>

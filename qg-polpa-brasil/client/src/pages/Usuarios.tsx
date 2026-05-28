@@ -1,39 +1,90 @@
-import { useState } from 'react'
-import { trpc } from '../lib/trpc'
+import { useEffect, useState } from 'react'
+import {
+  createUser,
+  getUsers,
+  resetUserPassword,
+  updateUser,
+  type ApiUser,
+} from '../lib/api'
 import { Plus, Key, UserX, UserCheck, Copy, Check } from 'lucide-react'
 
 type Role = 'ADMIN' | 'VENDEDOR'
 
 export default function Usuarios() {
-  const { data: lista, refetch } = trpc.users.list.useQuery()
   const [showCreate, setShowCreate] = useState(false)
   const [newUser, setNewUser] = useState({ name: '', email: '', role: 'VENDEDOR' as Role })
   const [tempPassword, setTempPassword] = useState<{ userId: number; pass: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
+  const [lista, setLista] = useState<ApiUser[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(true)
+  const [creatingUser, setCreatingUser] = useState(false)
+  const [updatingUserId, setUpdatingUserId] = useState<number | null>(null)
+  const [resettingUserId, setResettingUserId] = useState<number | null>(null)
 
-  const createMutation = trpc.users.create.useMutation({
-    onSuccess: (data) => {
+  async function refetch() {
+    setLoadingUsers(true)
+    setError('')
+
+    try {
+      const users = await getUsers()
+      setLista(users)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar usuários')
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
+
+  useEffect(() => {
+    refetch()
+  }, [])
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault()
+    setCreatingUser(true)
+    setError('')
+
+    try {
+      const data = await createUser(newUser)
       setTempPassword({ userId: data.id, pass: data.tempPassword })
       setShowCreate(false)
       setNewUser({ name: '', email: '', role: 'VENDEDOR' })
-      refetch()
-    },
-    onError: (err) => setError(err.message),
-  })
+      await refetch()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao criar usuário')
+    } finally {
+      setCreatingUser(false)
+    }
+  }
 
-  const updateMutation = trpc.users.update.useMutation({ onSuccess: () => refetch() })
-  const resetMutation = trpc.users.resetPassword.useMutation({
-    onSuccess: (data, vars) => {
-      setTempPassword({ userId: vars.id, pass: data.tempPassword })
-      refetch()
-    },
-  })
-
-  function handleCreate(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleUpdateUser(userId: number, payload: { role?: Role; ativo?: boolean }) {
+    setUpdatingUserId(userId)
     setError('')
-    createMutation.mutate(newUser)
+
+    try {
+      await updateUser(userId, payload)
+      await refetch()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao atualizar usuário')
+    } finally {
+      setUpdatingUserId(null)
+    }
+  }
+
+  async function handleResetPassword(userId: number) {
+    setResettingUserId(userId)
+    setError('')
+
+    try {
+      const data = await resetUserPassword(userId)
+      setTempPassword({ userId, pass: data.tempPassword })
+      await refetch()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao resetar senha')
+    } finally {
+      setResettingUserId(null)
+    }
   }
 
   function copyPassword() {
@@ -121,12 +172,19 @@ export default function Usuarios() {
             </div>
             {error && <p className="text-red-400 text-xs">{error}</p>}
             <div className="flex gap-3">
-              <button type="submit" disabled={createMutation.isPending} className="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-sm font-semibold rounded-lg px-4 py-2 transition">
-                {createMutation.isPending ? 'Criando...' : 'Criar usuário'}
+              <button type="submit" disabled={creatingUser} className="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-sm font-semibold rounded-lg px-4 py-2 transition">
+                {creatingUser ? 'Criando...' : 'Criar usuário'}
               </button>
               <button type="button" onClick={() => setShowCreate(false)} className="text-slate-400 hover:text-white text-sm transition">Cancelar</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Erro ao carregar ou atualizar usuários */}
+      {error && !showCreate && (
+        <div className="bg-red-900/30 border border-red-700 rounded-xl p-4">
+          <p className="text-sm text-red-300">{error}</p>
         </div>
       )}
 
@@ -143,7 +201,7 @@ export default function Usuarios() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700">
-            {(lista ?? []).map(u => (
+            {lista.map(u => (
               <tr key={u.id} className="hover:bg-slate-700/40 transition">
                 <td className="px-5 py-3.5">
                   <p className="font-medium text-white">{u.name}</p>
@@ -170,23 +228,26 @@ export default function Usuarios() {
                 <td className="px-4 py-3.5 text-right">
                   <div className="flex items-center justify-end gap-2">
                     <button
-                      onClick={() => resetMutation.mutate({ id: u.id })}
+                      onClick={() => handleResetPassword(u.id)}
+                      disabled={resettingUserId === u.id}
                       title="Resetar senha"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-700 transition"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-700 disabled:opacity-50 transition"
                     >
                       <Key size={14} />
                     </button>
                     <button
-                      onClick={() => updateMutation.mutate({ id: u.id, ativo: !u.ativo })}
+                      onClick={() => handleUpdateUser(u.id, { ativo: !u.ativo })}
+                      disabled={updatingUserId === u.id}
                       title={u.ativo ? 'Desativar' : 'Ativar'}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 disabled:opacity-50 transition"
                     >
                       {u.ativo ? <UserX size={14} /> : <UserCheck size={14} />}
                     </button>
                     <select
                       value={u.role}
-                      onChange={e => updateMutation.mutate({ id: u.id, role: e.target.value as Role })}
-                      className="bg-slate-700 border border-slate-600 rounded text-xs text-white px-1.5 py-1 focus:outline-none"
+                      disabled={updatingUserId === u.id}
+                      onChange={e => handleUpdateUser(u.id, { role: e.target.value as Role })}
+                      className="bg-slate-700 border border-slate-600 rounded text-xs text-white px-1.5 py-1 disabled:opacity-50 focus:outline-none"
                     >
                       <option value="VENDEDOR">Vendedor</option>
                       <option value="ADMIN">Admin</option>
@@ -197,7 +258,12 @@ export default function Usuarios() {
             ))}
           </tbody>
         </table>
-        {(!lista || lista.length === 0) && (
+
+        {loadingUsers && (
+          <div className="p-8 text-center text-slate-400 text-sm">Carregando usuários...</div>
+        )}
+
+        {!loadingUsers && lista.length === 0 && (
           <div className="p-8 text-center text-slate-400 text-sm">Nenhum usuário cadastrado.</div>
         )}
       </div>
