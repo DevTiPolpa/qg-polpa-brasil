@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { login, type AuthUser } from '../lib/api'
+import {version} from '../../../package.json'
 
 export default function Login({ onLogin }: { onLogin: (user: AuthUser) => void }) {
   const [email, setEmail] = useState('')
@@ -78,7 +79,12 @@ export default function Login({ onLogin }: { onLogin: (user: AuthUser) => void }
         <p className="text-center text-slate-500 text-xs mt-6">
           Problemas de acesso? Contate o administrador do sistema.
         </p>
+        <div className="text-center text-slate-500 text-xs mt-6">
+        {version}
+        </div>
       </div>
+
+      
     </div>
   )
 }
