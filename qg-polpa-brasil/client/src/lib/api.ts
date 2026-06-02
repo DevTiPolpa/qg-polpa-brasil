@@ -96,6 +96,50 @@ export type LogoutResponse = {
   success: boolean
 }
 
+export type ApiMeta2026 = {
+  id: number
+  nomeVendedor: string
+  mes: string
+  valorMeta: number
+  projeto: string | null
+  mercadoVendas: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export type ApiMetas2026Response = {
+  status: 'ok'
+  count: number
+  metas: ApiMeta2026[]
+}
+
+export type UpsertMeta2026Payload = {
+  nomeVendedor: string
+  mes: string
+  valorMeta: number
+  projeto?: string | null
+  mercadoVendas?: string | null
+}
+
+export type B2BResumoItem = {
+  anoMes: string
+  vendedor: string
+  projeto: string
+  mercadoVendas: string
+  quantidadeNegociada: number
+  quantidadeEntregue: number
+  pesoLiquido: number
+  valorPendente: number
+  notas: number
+  clientes: number
+}
+
+export type ApiB2BResumoResponse = {
+  status: 'ok'
+  count: number
+  resumo: B2BResumoItem[]
+}
+
 export async function getUsers(limit = 100): Promise<ApiUser[]> {
   const data = await apiRequest<ApiUsersResponse>(`/api/users?limit=${limit}`)
   return data.users
@@ -145,33 +189,6 @@ export async function changePassword(payload: ChangePasswordPayload): Promise<Lo
   })
 }
 
-
-
-export type ApiMeta2026 = {
-  id: number
-  nomeVendedor: string
-  mes: string
-  valorMeta: number
-  projeto: string | null
-  mercadoVendas: string | null
-  createdAt: string | null
-  updatedAt: string | null
-}
-
-export type ApiMetas2026Response = {
-  status: 'ok'
-  count: number
-  metas: ApiMeta2026[]
-}
-
-export type UpsertMeta2026Payload = {
-  nomeVendedor: string
-  mes: string
-  valorMeta: number
-  projeto?: string | null
-  mercadoVendas?: string | null
-}
-
 export async function getMetas2026(ano = '2026'): Promise<ApiMeta2026[]> {
   const data = await apiRequest<ApiMetas2026Response>(`/api/metas?ano=${encodeURIComponent(ano)}`)
   return data.metas
@@ -188,4 +205,9 @@ export async function deleteMeta2026(id: number): Promise<ApiMessageResponse> {
   return apiRequest<ApiMessageResponse>(`/api/metas/${id}`, {
     method: 'DELETE',
   })
+}
+
+export async function getB2BResumo(ano = '2026'): Promise<B2BResumoItem[]> {
+  const data = await apiRequest<ApiB2BResumoResponse>(`/api/b2b/resumo?ano=${encodeURIComponent(ano)}`)
+  return data.resumo
 }
