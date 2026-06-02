@@ -144,3 +144,48 @@ export async function changePassword(payload: ChangePasswordPayload): Promise<Lo
     body: JSON.stringify(payload),
   })
 }
+
+
+
+export type ApiMeta2026 = {
+  id: number
+  nomeVendedor: string
+  mes: string
+  valorMeta: number
+  projeto: string | null
+  mercadoVendas: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export type ApiMetas2026Response = {
+  status: 'ok'
+  count: number
+  metas: ApiMeta2026[]
+}
+
+export type UpsertMeta2026Payload = {
+  nomeVendedor: string
+  mes: string
+  valorMeta: number
+  projeto?: string | null
+  mercadoVendas?: string | null
+}
+
+export async function getMetas2026(ano = '2026'): Promise<ApiMeta2026[]> {
+  const data = await apiRequest<ApiMetas2026Response>(`/api/metas?ano=${encodeURIComponent(ano)}`)
+  return data.metas
+}
+
+export async function upsertMeta2026(payload: UpsertMeta2026Payload): Promise<ApiMessageResponse> {
+  return apiRequest<ApiMessageResponse>('/api/metas', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteMeta2026(id: number): Promise<ApiMessageResponse> {
+  return apiRequest<ApiMessageResponse>(`/api/metas/${id}`, {
+    method: 'DELETE',
+  })
+}
