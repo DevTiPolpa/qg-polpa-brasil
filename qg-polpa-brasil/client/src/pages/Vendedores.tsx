@@ -180,7 +180,8 @@ export default function Vendedores() {
       if (selected && vendedor !== selected) return false
       if (projetosAtivos.length > 0 && !projetosAtivos.includes(projeto)) return false
       if (tipoAtivo === 'NOVO_PROJETO' && !projetoEhNovoProjeto(projeto)) return false
-      if ((tipoAtivo === 'VENDA_FIRME' || tipoAtivo === 'FORECAST') && projetoEhNovoProjeto(projeto)) return false
+      if (tipoAtivo === 'VENDA_FIRME' && projetoEhNovoProjeto(projeto)) return false
+      if (tipoAtivo === 'FORECAST') return false
       return true
     })
   }, [b2bResumo, filtros, selected, projetosAtivos, tipoAtivo])
