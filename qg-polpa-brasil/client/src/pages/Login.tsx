@@ -80,7 +80,8 @@ export default function Login({ onLogin }: { onLogin: (user: AuthUser) => void }
           Problemas de acesso? Contate o administrador do sistema.
         </p>
         <div className="text-center text-slate-500 text-xs mt-6">
-        {version} Teste Gilmar
+        {version}
+
         </div>
       </div>
 
