@@ -1,10 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { trpc } from '../lib/trpc'
-import FiltrosGlobais, { type Filtros } from '../components/FiltrosGlobais'
+import { type Filtros } from '../components/FiltrosGlobais'
+import MultiSelect from '../components/MultiSelect'
 import { formatCurrency, formatNumber, formatKg, formatMes } from '../lib/utils'
 import { TAILWIND, BORDER_L_COLOR } from '../lib/colors'
-import { ChevronRight, ChevronDown, ExternalLink, Target, DollarSign } from 'lucide-react'
+import { ChevronRight, ChevronDown, ExternalLink, Target, DollarSign, SlidersHorizontal, X } from 'lucide-react'
+import { getB2BResumo, type B2BResumoItem } from '../lib/api'
 
 const SPARKLINE_COLOR: Record<string, string> = {
   VENDA_FIRME: '#22c55e',
@@ -221,6 +223,42 @@ export default function Vendedores() {
   const [selected, setSelected] = useState<string | null>(null)
   const [tipoAtivo, setTipoAtivo] = useState<string | null>(null)
   const [projetosAtivos, setProjetosAtivos] = useState<string[]>([])
+  const [b2bResumo, setB2BResumo] = useState<B2BResumoItem[]>([])
+  const [b2bLoading, setB2BLoading] = useState(false)
+  const [b2bError, setB2BError] = useState<string | null>(null)
+
+  const anoB2B = filtros.dataInicio?.slice(0, 4) || '2026'
+
+  useEffect(() => {
+    let ativo = true
+
+    async function carregarB2B() {
+      try {
+        setB2BLoading(true)
+        setB2BError(null)
+        const rows = await getB2BResumo(anoB2B)
+
+        if (ativo) {
+          setB2BResumo(rows)
+        }
+      } catch (error) {
+        if (ativo) {
+          setB2BResumo([])
+          setB2BError(error instanceof Error ? error.message : 'Erro ao carregar resumo da B2B')
+        }
+      } finally {
+        if (ativo) {
+          setB2BLoading(false)
+        }
+      }
+    }
+
+    carregarB2B()
+
+    return () => {
+      ativo = false
+    }
+  }, [anoB2B])
 
   const filtrosComTipo: Filtros = (() => {
     let f = filtros
@@ -358,16 +396,109 @@ export default function Vendedores() {
   // Badges dos filtros ativos
   const badges: { label: string; onRemove: () => void }[] = []
   if (selected) badges.push({ label: `Vendedor: ${selected.replace(/^\d+ - /, '')}`, onRemove: () => setSelected(null) })
-  if (tipoAtivo) {
-    const labels: Record<string, string> = { VENDA_FIRME: 'Venda Firme', FORECAST: 'Forecast', NOVO_PROJETO: 'Novo Projeto' }
-    badges.push({ label: `Tipo: ${labels[tipoAtivo] ?? tipoAtivo}`, onRemove: () => setTipoAtivo(null) })
-  }
   projetosAtivos.forEach(p => badges.push({ label: `Projeto: ${p}`, onRemove: () => setProjetosAtivos(prev => prev.filter(x => x !== p)) }))
   ;(filtros.mercados ?? []).forEach(v => badges.push({ label: `Mercado: ${v}`, onRemove: () => setFiltros(f => ({ ...f, mercados: (f.mercados ?? []).filter(x => x !== v) })) }))
   ;(filtros.vendedores ?? []).forEach(v => badges.push({ label: `Vendedor: ${v.replace(/^\d+ - /, '')}`, onRemove: () => setFiltros(f => ({ ...f, vendedores: (f.vendedores ?? []).filter(x => x !== v) })) }))
   ;(filtros.projetos ?? []).forEach(v => badges.push({ label: `Projeto: ${v}`, onRemove: () => setFiltros(f => ({ ...f, projetos: (f.projetos ?? []).filter(x => x !== v) })) }))
   ;(filtros.gruposProduto ?? []).forEach(v => badges.push({ label: `Grupo: ${v}`, onRemove: () => setFiltros(f => ({ ...f, gruposProduto: (f.gruposProduto ?? []).filter(x => x !== v) })) }))
   ;(filtros.tiposReceita ?? []).forEach(v => badges.push({ label: `Tipo: ${v}`, onRemove: () => setFiltros(f => ({ ...f, tiposReceita: (f.tiposReceita ?? []).filter(x => x !== v) })) }))
+
+  const b2bFiltrado = useMemo(() => {
+    const ini = filtros.dataInicio ? filtros.dataInicio.slice(0, 7) : null
+    const fim = filtros.dataFim ? filtros.dataFim.slice(0, 7) : null
+    const vendedoresFiltro = selected ? [selected] : (filtros.vendedores ?? [])
+    const projetosFiltro = projetosAtivos.length > 0 ? projetosAtivos : (filtros.projetos ?? [])
+    const mercadosFiltro = filtros.mercados ?? []
+
+    return b2bResumo.filter(row => {
+      if (ini && row.anoMes < ini) return false
+      if (fim && row.anoMes > fim) return false
+      if (vendedoresFiltro.length > 0 && !vendedoresFiltro.includes(row.vendedor)) return false
+      if (projetosFiltro.length > 0 && !projetosFiltro.includes(row.projeto)) return false
+      if (mercadosFiltro.length > 0 && !mercadosFiltro.includes(row.mercadoVendas)) return false
+      return true
+    })
+  }, [b2bResumo, filtros.dataInicio, filtros.dataFim, filtros.vendedores, filtros.projetos, filtros.mercados, projetosAtivos, selected])
+
+  const b2bTotais = useMemo(() => {
+    return b2bFiltrado.reduce(
+      (acc, row) => {
+        acc.quantidadeNegociada += Number(row.quantidadeNegociada ?? 0)
+        acc.quantidadeEntregue += Number(row.quantidadeEntregue ?? 0)
+        acc.pesoLiquido += Number(row.pesoLiquido ?? 0)
+        acc.valorPendente += Number(row.valorPendente ?? 0)
+        acc.notas += Number(row.notas ?? 0)
+        acc.clientes += Number(row.clientes ?? 0)
+        return acc
+      },
+      {
+        quantidadeNegociada: 0,
+        quantidadeEntregue: 0,
+        pesoLiquido: 0,
+        valorPendente: 0,
+        notas: 0,
+        clientes: 0,
+      }
+    )
+  }, [b2bFiltrado])
+
+  const b2bPorVendedor = useMemo(() => {
+    const map = new Map<string, {
+      vendedor: string
+      quantidadeNegociada: number
+      quantidadeEntregue: number
+      pesoLiquido: number
+      valorPendente: number
+      notas: number
+      clientes: number
+    }>()
+
+    for (const row of b2bFiltrado) {
+      const atual = map.get(row.vendedor) ?? {
+        vendedor: row.vendedor,
+        quantidadeNegociada: 0,
+        quantidadeEntregue: 0,
+        pesoLiquido: 0,
+        valorPendente: 0,
+        notas: 0,
+        clientes: 0,
+      }
+
+      atual.quantidadeNegociada += Number(row.quantidadeNegociada ?? 0)
+      atual.quantidadeEntregue += Number(row.quantidadeEntregue ?? 0)
+      atual.pesoLiquido += Number(row.pesoLiquido ?? 0)
+      atual.valorPendente += Number(row.valorPendente ?? 0)
+      atual.notas += Number(row.notas ?? 0)
+      atual.clientes += Number(row.clientes ?? 0)
+
+      map.set(row.vendedor, atual)
+    }
+
+    return Array.from(map.values()).sort((a, b) => b.valorPendente - a.valorPendente)
+  }, [b2bFiltrado])
+
+
+  const b2bOpcoes = useMemo(() => {
+    const unico = (valores: Array<string | null | undefined>) =>
+      Array.from(new Set(valores.map(v => String(v ?? '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+
+    return {
+      mercados: unico(b2bResumo.map(row => row.mercadoVendas)),
+      vendedores: unico(b2bResumo.map(row => row.vendedor)),
+      projetos: unico(b2bResumo.map(row => row.projeto)),
+    }
+  }, [b2bResumo])
+
+  const limparFiltrosB2B = () => {
+    setFiltros(DEFAULT_FILTROS)
+    setTipoAtivo(null)
+    setProjetosAtivos([])
+    setSelected(null)
+  }
+
+  const aplicarPeriodoRapido = (dataInicio: string, dataFim: string) => {
+    setFiltros(prev => ({ ...prev, dataInicio, dataFim }))
+  }
 
   return (
     <div className="space-y-4">
@@ -376,7 +507,112 @@ export default function Vendedores() {
         <p className="text-slate-400 text-sm mt-0.5">Performance individual, carteira de clientes e evolução</p>
       </div>
 
-      <FiltrosGlobais filtros={filtros} onChange={setFiltros} />
+      {/* Filtros B2B — opções derivadas da própria tabela B2B */}
+      <div className="rounded-xl border border-border bg-card px-4 py-3 space-y-2.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Filtros B2B</span>
+          <span className="text-xs text-muted-foreground/50">· Consulta somente leitura da tabela B2B</span>
+          <span className="ml-1 px-2 py-0.5 rounded-full bg-primary/15 text-primary text-[11px] font-medium">
+            {filtros.dataInicio?.slice(0, 4) ?? '2026'}
+          </span>
+          {temQualquerFiltro && (
+            <button
+              type="button"
+              onClick={limparFiltrosB2B}
+              className="ml-auto h-6 text-xs text-muted-foreground hover:text-foreground gap-1 px-2 inline-flex items-center"
+            >
+              <X className="w-3 h-3" />
+              Limpar filtros
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <MultiSelect
+            options={b2bOpcoes.mercados}
+            selected={filtros.mercados ?? []}
+            onChange={(vals) => setFiltros(prev => ({ ...prev, mercados: vals, mercado: vals[0] }))}
+            placeholder="Todos os mercados"
+            className="flex-1 min-w-[130px] max-w-[220px]"
+          />
+          <MultiSelect
+            options={b2bOpcoes.vendedores}
+            selected={filtros.vendedores ?? []}
+            onChange={(vals) => {
+              setSelected(null)
+              setFiltros(prev => ({ ...prev, vendedores: vals, vendedor: vals[0] }))
+            }}
+            placeholder="Todos os vendedores"
+            className="flex-1 min-w-[150px] max-w-[240px]"
+          />
+          <MultiSelect
+            options={b2bOpcoes.projetos}
+            selected={filtros.projetos ?? []}
+            onChange={(vals) => {
+              setProjetosAtivos([])
+              setFiltros(prev => ({ ...prev, projetos: vals, projeto: vals[0] }))
+            }}
+            placeholder="Todos os projetos"
+            className="flex-1 min-w-[130px] max-w-[220px]"
+          />
+          <button
+            type="button"
+            disabled
+            title="A consulta B2B atual não traz grupo de produto. Para habilitar este filtro, o backend precisa retornar grupoProduto na rota B2B."
+            className="flex-1 min-w-[130px] max-w-[220px] h-7 px-2.5 rounded-md border border-border bg-background/60 text-xs text-muted-foreground text-left opacity-60 cursor-not-allowed"
+          >
+            Grupos indisponíveis na B2B
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => aplicarPeriodoRapido('2026-01-01', '2026-12-31')}
+            className={`h-7 px-2.5 rounded-md text-[11px] font-medium transition-all border ${
+              filtros.dataInicio === '2026-01-01' && filtros.dataFim === '2026-12-31'
+                ? 'bg-primary/20 border-primary/50 text-primary'
+                : 'bg-background border-border text-muted-foreground hover:text-foreground hover:border-border/80 hover:bg-accent'
+            }`}
+          >
+            2026
+          </button>
+          <button
+            type="button"
+            onClick={() => aplicarPeriodoRapido('2025-01-01', '2025-12-31')}
+            className={`h-7 px-2.5 rounded-md text-[11px] font-medium transition-all border ${
+              filtros.dataInicio === '2025-01-01' && filtros.dataFim === '2025-12-31'
+                ? 'bg-primary/20 border-primary/50 text-primary'
+                : 'bg-background border-border text-muted-foreground hover:text-foreground hover:border-border/80 hover:bg-accent'
+            }`}
+          >
+            2025
+          </button>
+          <button
+            type="button"
+            onClick={() => aplicarPeriodoRapido('2026-01-01', '2026-06-30')}
+            className={`h-7 px-2.5 rounded-md text-[11px] font-medium transition-all border ${
+              filtros.dataInicio === '2026-01-01' && filtros.dataFim === '2026-06-30'
+                ? 'bg-primary/20 border-primary/50 text-primary'
+                : 'bg-background border-border text-muted-foreground hover:text-foreground hover:border-border/80 hover:bg-accent'
+            }`}
+          >
+            1º Sem 2026
+          </button>
+          <button
+            type="button"
+            onClick={() => aplicarPeriodoRapido('2026-07-01', '2026-12-31')}
+            className={`h-7 px-2.5 rounded-md text-[11px] font-medium transition-all border ${
+              filtros.dataInicio === '2026-07-01' && filtros.dataFim === '2026-12-31'
+                ? 'bg-primary/20 border-primary/50 text-primary'
+                : 'bg-background border-border text-muted-foreground hover:text-foreground hover:border-border/80 hover:bg-accent'
+            }`}
+          >
+            2º Sem 2026
+          </button>
+        </div>
+      </div>
 
       {/* Botões rápidos de Projeto */}
       {(todosProjetos ?? []).length > 0 && (
@@ -429,77 +665,140 @@ export default function Vendedores() {
         </div>
       )}
 
-      {/* KPI cards com sparklines */}
+      {/* KPI cards — baseados na B2B */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-
-          {/* Card Faturamento Total */}
-          {(() => {
-            const fatAtual = totalFat
-            const fatAnt = Number(kpisAnt?.faturamentoTotal ?? 0)
-            const pct = fatAnt > 0 ? ((fatAtual - fatAnt) / fatAnt) * 100 : null
-            const positivo = pct != null && pct >= 0
-            return (
-              <div className="text-left rounded-xl border border-l-4 border-l-green-500 bg-slate-800 px-4 pt-4 pb-2 flex flex-col">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Faturamento</p>
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-green-500/15">
-                    <DollarSign className="w-3 h-3 text-green-400" />
-                  </div>
-                </div>
-                <p className="text-lg font-bold text-white leading-none mb-1">{formatCurrency(fatAtual)}</p>
-                <div className="mt-auto -mx-1">
-                  <MiniSparkline data={sparklines.TOTAL} color="#22c55e" />
-                </div>
-              </div>
-            )
-          })()}
-
-          {[
-            { key: 'VENDA_FIRME',  label: 'Venda Firme',  kpi: kpiVendaFirme  },
-            { key: 'FORECAST',     label: 'Forecast',     kpi: kpiForecast    },
-            { key: 'NOVO_PROJETO', label: 'Novo Projeto', kpi: kpiNovoProjeto },
-          ].map(({ key, label, kpi }) => {
-            const isActive = tipoAtivo === key
-            const color = SPARKLINE_COLOR[key]
-            return (
-              <button key={key} onClick={() => setTipoAtivo(isActive ? null : key)}
-                className={`text-left rounded-xl border border-l-4 ${BORDER_L_COLOR[key]} bg-slate-800 px-4 pt-4 pb-2 flex flex-col transition-all duration-150 ${isActive ? 'ring-2 ring-offset-1 ring-offset-slate-900 ring-white/20 shadow-lg' : 'hover:bg-slate-700/60 cursor-pointer'}`}
-              >
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">
-                  {label}{isActive && <span className={`ml-1.5 ${TAILWIND[key as keyof typeof TAILWIND].text}`}>●</span>}
-                </p>
-                <p className="text-lg font-bold text-white leading-none mb-1">{formatCurrency(Number(kpi?.faturamento ?? 0))}</p>
-                <div className="mt-auto -mx-1">
-                  <MiniSparkline data={sparklines[key] ?? []} color={color} />
-                </div>
-              </button>
-            )
-          })}
-
-          {/* Card Meta */}
-          <div className="text-left rounded-xl border border-l-4 border-l-orange-500 bg-slate-800 px-4 pt-4 pb-3 flex flex-col">
-            <div className="flex items-center gap-1.5 mb-2">
-              <Target className="w-3 h-3 text-orange-400" />
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Meta 2026</p>
+        <div className="text-left rounded-xl border border-l-4 border-l-blue-500 bg-slate-800 px-4 pt-4 pb-4 flex flex-col">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Valor pendente B2B</p>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-blue-500/15">
+              <DollarSign className="w-3 h-3 text-blue-400" />
             </div>
-            <p className="text-lg font-bold text-white leading-none mb-1">{formatCurrency(totalMeta)}</p>
-            {totalMeta > 0 && totalFat > 0 && (
-              <div className="space-y-1.5 mt-auto">
-                <span className={`text-[11px] font-semibold ${totalFat >= totalMeta ? 'text-green-400' : 'text-orange-400'}`}>
-                  {((totalFat / totalMeta) * 100).toFixed(1)}% atingido
-                </span>
-                {totalFat < totalMeta && (
-                  <p className="text-[10px] text-slate-500">
-                    Faltam <span className="text-slate-300">{formatCurrency(totalMeta - totalFat)}</span>
-                  </p>
-                )}
-                <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full bg-orange-500 transition-all" style={{ width: `${Math.min(100, (totalFat / totalMeta) * 100)}%` }} />
-                </div>
-              </div>
-            )}
+          </div>
+          <p className="text-lg font-bold text-white leading-none mb-1">{formatCurrency(b2bTotais.valorPendente)}</p>
+          <p className="text-[10px] text-slate-500 mt-auto">Base: ValorPendente da B2B</p>
+        </div>
+
+        <div className="text-left rounded-xl border border-l-4 border-l-green-500 bg-slate-800 px-4 pt-4 pb-4 flex flex-col">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Qtd. negociada</p>
+          <p className="text-lg font-bold text-white leading-none mb-1">{formatNumber(b2bTotais.quantidadeNegociada, 0)}</p>
+          <p className="text-[10px] text-slate-500 mt-auto">Pedidos/negociações no período</p>
+        </div>
+
+        <div className="text-left rounded-xl border border-l-4 border-l-yellow-500 bg-slate-800 px-4 pt-4 pb-4 flex flex-col">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Qtd. entregue</p>
+          <p className="text-lg font-bold text-white leading-none mb-1">{formatNumber(b2bTotais.quantidadeEntregue, 0)}</p>
+          <p className="text-[10px] text-slate-500 mt-auto">Entregue conforme B2B</p>
+        </div>
+
+        <div className="text-left rounded-xl border border-l-4 border-l-cyan-500 bg-slate-800 px-4 pt-4 pb-4 flex flex-col">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Peso líquido</p>
+          <p className="text-lg font-bold text-white leading-none mb-1">{formatKg(b2bTotais.pesoLiquido)}</p>
+          <p className="text-[10px] text-slate-500 mt-auto">Peso total filtrado</p>
+        </div>
+
+        <div className="text-left rounded-xl border border-l-4 border-l-orange-500 bg-slate-800 px-4 pt-4 pb-4 flex flex-col">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Target className="w-3 h-3 text-orange-400" />
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Notas / Clientes</p>
+          </div>
+          <p className="text-lg font-bold text-white leading-none mb-1">{formatNumber(b2bTotais.notas, 0)} / {formatNumber(b2bTotais.clientes, 0)}</p>
+          <p className="text-[10px] text-slate-500 mt-auto">Quantidade de notas e clientes</p>
+        </div>
+      </div>
+
+
+      {/* B2B ERP — somente leitura */}
+      <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-700 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-white">Detalhamento B2B por vendedor</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Resumo por vendedor da tabela B2B. Consulta somente leitura; sem edição pelo QG.
+            </p>
+          </div>
+          <span className="text-[10px] font-semibold uppercase tracking-widest rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-300 px-2 py-1">
+            Somente leitura
+          </span>
+        </div>
+
+        {b2bError && (
+          <div className="mx-5 mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+            {b2bError}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-5 border-b border-slate-700/60">
+          <div className="rounded-lg bg-slate-900/50 border border-slate-700 px-3 py-3">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Valor pendente</p>
+            <p className="text-lg font-bold text-white mt-1">{formatCurrency(b2bTotais.valorPendente)}</p>
+          </div>
+          <div className="rounded-lg bg-slate-900/50 border border-slate-700 px-3 py-3">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Qtd. negociada</p>
+            <p className="text-lg font-bold text-white mt-1">{formatNumber(b2bTotais.quantidadeNegociada, 0)}</p>
+          </div>
+          <div className="rounded-lg bg-slate-900/50 border border-slate-700 px-3 py-3">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Qtd. entregue</p>
+            <p className="text-lg font-bold text-white mt-1">{formatNumber(b2bTotais.quantidadeEntregue, 0)}</p>
+          </div>
+          <div className="rounded-lg bg-slate-900/50 border border-slate-700 px-3 py-3">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Peso líquido</p>
+            <p className="text-lg font-bold text-white mt-1">{formatKg(b2bTotais.pesoLiquido)}</p>
+          </div>
+          <div className="rounded-lg bg-slate-900/50 border border-slate-700 px-3 py-3">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Notas / Clientes</p>
+            <p className="text-lg font-bold text-white mt-1">{formatNumber(b2bTotais.notas, 0)} / {formatNumber(b2bTotais.clientes, 0)}</p>
           </div>
         </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-900/40 text-[10px] uppercase tracking-widest text-slate-500">
+              <tr>
+                <th className="px-5 py-2 text-left font-semibold">Vendedor</th>
+                <th className="px-3 py-2 text-right font-semibold">Valor pendente</th>
+                <th className="px-3 py-2 text-right font-semibold">Qtd. negociada</th>
+                <th className="px-3 py-2 text-right font-semibold">Qtd. entregue</th>
+                <th className="px-3 py-2 text-right font-semibold">Peso líquido</th>
+                <th className="px-5 py-2 text-right font-semibold">Notas</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/50">
+              {b2bLoading && (
+                <tr>
+                  <td colSpan={6} className="px-5 py-5 text-center text-slate-400">
+                    Carregando dados da B2B...
+                  </td>
+                </tr>
+              )}
+
+              {!b2bLoading && b2bPorVendedor.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-5 py-5 text-center text-slate-500">
+                    Nenhum registro encontrado para os filtros atuais.
+                  </td>
+                </tr>
+              )}
+
+              {!b2bLoading && b2bPorVendedor.slice(0, 10).map(row => (
+                <tr key={row.vendedor} className="hover:bg-slate-700/25 transition-colors">
+                  <td className="px-5 py-2.5 text-white font-medium">{row.vendedor}</td>
+                  <td className="px-3 py-2.5 text-right text-blue-300 font-semibold">{formatCurrency(row.valorPendente)}</td>
+                  <td className="px-3 py-2.5 text-right text-slate-300">{formatNumber(row.quantidadeNegociada, 0)}</td>
+                  <td className="px-3 py-2.5 text-right text-slate-300">{formatNumber(row.quantidadeEntregue, 0)}</td>
+                  <td className="px-3 py-2.5 text-right text-slate-300">{formatKg(row.pesoLiquido)}</td>
+                  <td className="px-5 py-2.5 text-right text-slate-300">{formatNumber(row.notas, 0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="px-5 py-3 border-t border-slate-700/60 bg-slate-900/20">
+          <p className="text-[11px] text-slate-500">
+            Observação: ValorPendente está sendo exibido como indicador operacional. Ele ainda não deve ser usado como faturamento realizado definitivo até confirmarmos a regra financeira correta do ERP.
+          </p>
+        </div>
+      </div>
 
       {/* Layout vertical: Evolução → Resultado → Top Clientes */}
       <div className="flex flex-col gap-4">
