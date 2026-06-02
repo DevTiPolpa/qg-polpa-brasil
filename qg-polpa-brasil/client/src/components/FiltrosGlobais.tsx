@@ -22,11 +22,19 @@ export interface Filtros {
   uf?: string;
 }
 
+export interface FiltrosOpcoesOverride {
+  mercados?: string[];
+  vendedores?: string[];
+  projetos?: string[];
+  grupos?: string[];
+}
+
 interface Props {
   filtros: Filtros;
   onChange: (f: Filtros) => void;
   showTipoReceita?: boolean;
   showProjetos?: boolean;
+  opcoesOverride?: FiltrosOpcoesOverride;
 }
 
 const MESES = [
@@ -221,8 +229,15 @@ function PeriodoPicker({ filtros, onChange }: { filtros: Filtros; onChange: (f: 
 }
 
 // ─── Componente principal ────────────────────────────────────────────────────
-export default function FiltrosGlobais({ filtros, onChange, showTipoReceita = true, showProjetos = true }: Props) {
-  const { data: disponiveis } = trpc.filtros.disponiveis.useQuery();
+export default function FiltrosGlobais({ filtros, onChange, showTipoReceita = true, showProjetos = true, opcoesOverride }: Props) {
+  const { data: disponiveis } = trpc.filtros.disponiveis.useQuery(undefined, { enabled: !opcoesOverride });
+
+  const opcoes = {
+    mercados: opcoesOverride?.mercados ?? disponiveis?.mercados ?? [],
+    vendedores: opcoesOverride?.vendedores ?? disponiveis?.vendedores ?? [],
+    projetos: opcoesOverride?.projetos ?? disponiveis?.projetos ?? [],
+    grupos: opcoesOverride?.grupos ?? disponiveis?.grupos ?? [],
+  };
 
   const limpar = () => onChange({ dataInicio: "2026-01-01", dataFim: "2026-12-31" });
 
@@ -281,14 +296,14 @@ export default function FiltrosGlobais({ filtros, onChange, showTipoReceita = tr
       {/* Row 1: Multi-selects */}
       <div className="flex items-center gap-2 flex-wrap">
         <MultiSelect
-          options={(disponiveis?.mercados ?? []).filter(Boolean) as string[]}
+          options={(opcoes.mercados ?? []).filter(Boolean) as string[]}
           selected={filtros.mercados ?? []}
           onChange={(vals) => onChange({ ...filtros, mercados: vals, mercado: vals[0] })}
           placeholder="Todos os mercados"
           className="flex-1 min-w-[130px] max-w-[200px]"
         />
         <MultiSelect
-          options={(disponiveis?.vendedores ?? []).filter(Boolean) as string[]}
+          options={(opcoes.vendedores ?? []).filter(Boolean) as string[]}
           selected={filtros.vendedores ?? []}
           onChange={(vals) => onChange({ ...filtros, vendedores: vals, vendedor: vals[0] })}
           placeholder="Todos os vendedores"
@@ -296,7 +311,7 @@ export default function FiltrosGlobais({ filtros, onChange, showTipoReceita = tr
         />
         {showProjetos && (
           <MultiSelect
-            options={(disponiveis?.projetos ?? []).filter(Boolean) as string[]}
+            options={(opcoes.projetos ?? []).filter(Boolean) as string[]}
             selected={filtros.projetos ?? []}
             onChange={(vals) => onChange({ ...filtros, projetos: vals, projeto: vals[0] })}
             placeholder="Todos os projetos"
@@ -304,7 +319,7 @@ export default function FiltrosGlobais({ filtros, onChange, showTipoReceita = tr
           />
         )}
         <MultiSelect
-          options={(disponiveis?.grupos ?? []).filter(Boolean) as string[]}
+          options={(opcoes.grupos ?? []).filter(Boolean) as string[]}
           selected={filtros.gruposProduto ?? []}
           onChange={(vals) => onChange({ ...filtros, gruposProduto: vals, grupoProduto: vals[0] })}
           placeholder="Todos os grupos"
