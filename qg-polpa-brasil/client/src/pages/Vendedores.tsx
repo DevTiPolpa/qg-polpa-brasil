@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { getVendedoresOriginalResumo, type VendedoresOriginalResumo } from '../lib/api'
+import { getVendedoresOriginalResumo, getVendedoresOriginalClienteMix, type VendedoresOriginalResumo } from '../lib/api'
 import FiltrosGlobais, { type Filtros } from '../components/FiltrosGlobais'
 import { formatCurrency, formatNumber, formatKg, formatMes } from '../lib/utils'
 import { TAILWIND, BORDER_L_COLOR } from '../lib/colors'
@@ -168,9 +169,27 @@ function MetaGauge({ fat, meta }: { fat: number; meta: number }) {
 
 function ClienteRow({ c, selected, filtros }: { c: any; selected: string | null; filtros: Filtros }) {
   const [expanded, setExpanded] = useState(false)
-  // O endpoint consolidado atual entrega o Top Clientes, mas ainda não inclui o mix de produtos por cliente.
-  // Mantemos a expansão visual sem chamada tRPC para preservar a tela durante a migração para REST.
-  const mix: any[] = []
+  const mixQueryKey = useMemo(() => [
+    'vendedores-original-cliente-mix',
+    c.codParc,
+    filtros.dataInicio,
+    filtros.dataFim,
+    (filtros.mercados ?? []).join('|'),
+    (filtros.vendedores ?? []).join('|'),
+    (filtros.projetos ?? []).join('|'),
+    (filtros.gruposProduto ?? []).join('|'),
+    (filtros.tiposReceita ?? []).join('|'),
+    filtros.uf,
+    filtros.codProduto,
+  ], [c.codParc, filtros])
+
+  const { data: mix = [], isLoading: loadingMix, error: mixError } = useQuery({
+    queryKey: mixQueryKey,
+    queryFn: () => getVendedoresOriginalClienteMix(Number(c.codParc), filtros as any),
+    enabled: expanded && c.codParc != null,
+    staleTime: 30_000,
+  })
+
   return (
     <>
       <tr
@@ -193,7 +212,17 @@ function ClienteRow({ c, selected, filtros }: { c: any; selected: string | null;
           </button>
         </td>
       </tr>
-      {expanded && (mix ?? []).map((p: any) => (
+      {expanded && loadingMix && (
+        <tr className="bg-slate-900/60 border-l-2 border-l-slate-600">
+          <td colSpan={6} className="pl-7 pr-2 py-2 text-slate-500 text-[11px]">Carregando produtos...</td>
+        </tr>
+      )}
+      {expanded && mixError && (
+        <tr className="bg-slate-900/60 border-l-2 border-l-red-700">
+          <td colSpan={6} className="pl-7 pr-2 py-2 text-red-400 text-[11px]">Não foi possível carregar os produtos deste cliente.</td>
+        </tr>
+      )}
+      {expanded && !loadingMix && !mixError && (mix ?? []).map((p: any) => (
         <tr key={p.codProduto} className="bg-slate-900/60 border-l-2 border-l-slate-600">
           <td className="pl-7 pr-2 py-1.5 text-slate-300 text-[11px]">
             <span className="flex items-center gap-1.5">

@@ -550,7 +550,7 @@ export default function Dashboard() {
 
   const { data: resumo, isLoading: loadingResumo } = useQuery({
     queryKey: ["dashboard-original-resumo", filtrosCombinados],
-    queryFn: () => getDashboardOriginalResumo(filtrosCombinados as DashboardOriginalFiltros, 50),
+    queryFn: () => getDashboardOriginalResumo(filtrosCombinados as DashboardOriginalFiltros),
   });
 
   const kpis = resumo?.kpis;

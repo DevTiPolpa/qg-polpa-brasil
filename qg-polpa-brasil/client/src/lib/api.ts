@@ -253,6 +253,16 @@ export type VendedoresOriginalCliente = {
   ultimaCompra: string | null
 }
 
+export type VendedoresOriginalClienteMix = {
+  codProduto: number
+  nomeProduto: string | null
+  grupoProduto: string | null
+  faturamento: number
+  volume: number
+  pedidos: number
+  ultimaCompra: string | null
+}
+
 export type VendedoresOriginalMeta = {
   nomeVendedor: string
   mes: string
@@ -327,6 +337,20 @@ export async function getVendedoresOriginalResumo(filtros: VendedoresOriginalFil
   if (filtros.codParc != null) params.set('codParc', String(filtros.codParc))
   if (filtros.codProduto != null) params.set('codProduto', String(filtros.codProduto))
   return apiRequest<VendedoresOriginalResumo>(`/api/vendedores-original/resumo?${params.toString()}`)
+}
+
+export async function getVendedoresOriginalClienteMix(codParc: number, filtros: VendedoresOriginalFiltros = {}): Promise<VendedoresOriginalClienteMix[]> {
+  const params = new URLSearchParams()
+  params.set('dataInicio', filtros.dataInicio || '2026-01-01')
+  params.set('dataFim', filtros.dataFim || '2026-12-31')
+  appendArrayParam(params, 'mercados', filtros.mercados)
+  appendArrayParam(params, 'vendedores', filtros.vendedores)
+  appendArrayParam(params, 'projetos', filtros.projetos)
+  appendArrayParam(params, 'gruposProduto', filtros.gruposProduto)
+  appendArrayParam(params, 'tiposReceita', filtros.tiposReceita)
+  if (filtros.uf) params.set('uf', filtros.uf)
+  if (filtros.codProduto != null) params.set('codProduto', String(filtros.codProduto))
+  return apiRequest<VendedoresOriginalClienteMix[]>(`/api/vendedores-original/clientes/${codParc}/mix?${params.toString()}`)
 }
 
 
@@ -478,10 +502,10 @@ function appendDashboardFiltros(params: URLSearchParams, filtros: DashboardOrigi
   if (filtros.codProduto != null) params.set('codProduto', String(filtros.codProduto))
 }
 
-export async function getDashboardOriginalResumo(filtros: DashboardOriginalFiltros = {}, limitClientes = 50): Promise<DashboardOriginalResumo> {
+export async function getDashboardOriginalResumo(filtros: DashboardOriginalFiltros = {}, limitClientes?: number): Promise<DashboardOriginalResumo> {
   const params = new URLSearchParams()
   appendDashboardFiltros(params, filtros)
-  params.set('limitClientes', String(limitClientes))
+  if (limitClientes != null && limitClientes > 0) params.set('limitClientes', String(limitClientes))
   return apiRequest<DashboardOriginalResumo>(`/api/dashboard-original/resumo?${params.toString()}`)
 }
 
