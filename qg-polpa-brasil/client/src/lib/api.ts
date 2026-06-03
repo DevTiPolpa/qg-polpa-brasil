@@ -121,25 +121,6 @@ export type UpsertMeta2026Payload = {
   mercadoVendas?: string | null
 }
 
-export type B2BResumoItem = {
-  anoMes: string
-  vendedor: string
-  projeto: string
-  mercadoVendas: string
-  quantidadeNegociada: number
-  quantidadeEntregue: number
-  pesoLiquido: number
-  valorPendente: number
-  notas: number
-  clientes: number
-}
-
-export type ApiB2BResumoResponse = {
-  status: 'ok'
-  count: number
-  resumo: B2BResumoItem[]
-}
-
 export async function getUsers(limit = 100): Promise<ApiUser[]> {
   const data = await apiRequest<ApiUsersResponse>(`/api/users?limit=${limit}`)
   return data.users
@@ -207,7 +188,316 @@ export async function deleteMeta2026(id: number): Promise<ApiMessageResponse> {
   })
 }
 
-export async function getB2BResumo(ano = '2026'): Promise<B2BResumoItem[]> {
-  const data = await apiRequest<ApiB2BResumoResponse>(`/api/b2b/resumo?ano=${encodeURIComponent(ano)}`)
-  return data.resumo
+export type VendedoresOriginalFiltros = {
+  dataInicio?: string
+  dataFim?: string
+  mercados?: string[]
+  vendedores?: string[]
+  projetos?: string[]
+  gruposProduto?: string[]
+  tiposReceita?: string[]
+  uf?: string
+  codParc?: number
+  codProduto?: number
+  limitClientes?: number
+}
+
+export type VendedoresOriginalKpis = {
+  faturamentoTotal: number
+  volumeTotal: number
+  precoMedio: number
+  clientesAtivos: number
+  produtosVendidos: number
+  totalRegistros: number
+  vendaFirme: number
+  forecast: number
+  novoProjeto: number
+}
+
+export type VendedoresOriginalEvolucao = {
+  mes: string
+  faturamento: number
+  volume?: number
+  vendaFirme?: number
+  forecast?: number
+  novoProjeto?: number
+  clientes?: number
+}
+
+export type VendedoresOriginalEvolucaoTipo = {
+  mes: string
+  tipoReceita: string
+  faturamento: number
+}
+
+export type VendedoresOriginalPerformance = {
+  nomeVendedor: string
+  faturamento: number
+  volume: number
+  clientes: number
+  produtos: number
+  vendaFirme: number
+  forecast: number
+  novoProjeto: number
+  fatNovoProjeto: number
+  fatRecorrente: number
+}
+
+export type VendedoresOriginalCliente = {
+  codParc: number
+  razaoSocial: string | null
+  perfilParceiro: string | null
+  uf: string | null
+  faturamento: number
+  volume: number
+  ultimaCompra: string | null
+}
+
+export type VendedoresOriginalMeta = {
+  nomeVendedor: string
+  mes: string
+  valorMeta: number
+  projeto: string | null
+  mercadoVendas: string | null
+}
+
+export type VendedoresOriginalOrcamentoKpis = {
+  faturamentoTotal: number
+  volumeTotal: number
+  precoMedio: number
+  totalRegistros: number
+  clientesUnicos: number
+  produtosUnicos: number
+}
+
+export type VendedoresOriginalOrcamentoMensal = {
+  mes: string
+  faturamento: number
+  volume: number
+}
+
+export type VendedoresOriginalCrmMapping = {
+  id?: number
+  crmUserId?: number
+  nome?: string
+  nomeFaturamento?: string
+}
+
+export type VendedoresOriginalCrmKpis = {
+  crmUserId: number
+  emAndamento: number
+  valorAndamento: number
+  ganhos: number
+  valorGanho: number
+  perdidos: number
+  taxaConversao: number
+  cicloGanhos: number
+}
+
+export type VendedoresOriginalResumo = {
+  kpis: VendedoresOriginalKpis
+  evolucaoMensal: VendedoresOriginalEvolucao[]
+  evolucaoPorTipo: VendedoresOriginalEvolucaoTipo[]
+  vendedores: VendedoresOriginalPerformance[]
+  clientesConsolidados: VendedoresOriginalCliente[]
+  metas: VendedoresOriginalMeta[]
+  orcamentoKpis: VendedoresOriginalOrcamentoKpis
+  orcamentoMensal: VendedoresOriginalOrcamentoMensal[]
+  crmMapping: VendedoresOriginalCrmMapping[]
+  crmKpis: VendedoresOriginalCrmKpis[]
+}
+
+function appendArrayParam(params: URLSearchParams, key: string, values?: string[]) {
+  for (const value of values ?? []) {
+    if (value != null && String(value).trim()) params.append(key, String(value).trim())
+  }
+}
+
+export async function getVendedoresOriginalResumo(filtros: VendedoresOriginalFiltros = {}): Promise<VendedoresOriginalResumo> {
+  const params = new URLSearchParams()
+  params.set('dataInicio', filtros.dataInicio || '2026-01-01')
+  params.set('dataFim', filtros.dataFim || '2026-12-31')
+  params.set('limitClientes', String(filtros.limitClientes ?? 50))
+  appendArrayParam(params, 'mercados', filtros.mercados)
+  appendArrayParam(params, 'vendedores', filtros.vendedores)
+  appendArrayParam(params, 'projetos', filtros.projetos)
+  appendArrayParam(params, 'gruposProduto', filtros.gruposProduto)
+  appendArrayParam(params, 'tiposReceita', filtros.tiposReceita)
+  if (filtros.uf) params.set('uf', filtros.uf)
+  if (filtros.codParc != null) params.set('codParc', String(filtros.codParc))
+  if (filtros.codProduto != null) params.set('codProduto', String(filtros.codProduto))
+  return apiRequest<VendedoresOriginalResumo>(`/api/vendedores-original/resumo?${params.toString()}`)
+}
+
+
+
+export type DashboardOriginalFiltros = {
+  dataInicio?: string
+  dataFim?: string
+  mercados?: string[]
+  vendedores?: string[]
+  projetos?: string[]
+  gruposProduto?: string[]
+  tiposReceita?: string[]
+  mercado?: string
+  vendedor?: string
+  projeto?: string
+  grupoProduto?: string
+  tipoReceita?: string
+  uf?: string
+  codParc?: number
+  codProduto?: number
+}
+
+export type DashboardOriginalKpis = {
+  faturamentoTotal: number
+  volumeTotal: number
+  precoMedio: number
+  faturamentoDevolucao: number
+  volumeDevolucao: number
+  clientesAtivos: number
+  produtosVendidos: number
+  totalRegistros: number
+}
+
+export type DashboardOriginalEvolucao = {
+  mes: string
+  faturamento: number
+  volume: number
+  vendaFirme: number
+  forecast: number
+  novoProjeto: number
+}
+
+export type DashboardOriginalEvolucaoAnoAnterior = {
+  mes: string
+  faturamento: number
+  volume: number
+  mesAlinhado: string
+  mesOriginal: string
+}
+
+export type DashboardOriginalKpiTipo = {
+  tipoReceita: string
+  faturamento: number
+  volume: number
+  clientes: number
+  registros: number
+}
+
+export type DashboardOriginalSegmento = {
+  segmento: string | null
+  faturamento: number
+  volume: number
+  clientes: number
+  produtos: number
+}
+
+export type DashboardOriginalProjeto = {
+  projeto: string | null
+  faturamento: number
+  volume: number
+  clientes: number
+}
+
+export type DashboardOriginalClienteTop = {
+  codParc: number
+  razaoSocial: string | null
+  faturamento: number
+  volume: number
+  produtos: number
+}
+
+export type DashboardOriginalOrcamentoKpis = {
+  faturamentoTotal: number
+  volumeTotal: number
+  totalRegistros: number
+  clientesUnicos: number
+  produtosUnicos: number
+}
+
+export type DashboardOriginalOrcamentoMensal = {
+  mes: string
+  faturamento: number
+  volume: number
+}
+
+export type DashboardOriginalDrilldown = {
+  codParc: number
+  razaoSocial: string | null
+  codProduto: number
+  nomeProduto: string | null
+  grupoProduto: string | null
+  nomeVendedor: string | null
+  faturamento: number
+  volume: number
+  registros: number
+  dtPrevEntrega: string | null
+}
+
+export type DashboardOriginalClienteMix = {
+  codProduto: number
+  nomeProduto: string | null
+  grupoProduto: string | null
+  faturamento: number
+  volume: number
+}
+
+export type DashboardOriginalFiltrosDisponiveis = {
+  mercados: string[]
+  vendedores: string[]
+  projetos: string[]
+  grupos: string[]
+  clientes: Array<{ codParc: number; razaoSocial: string | null }>
+}
+
+export type DashboardOriginalResumo = {
+  kpis: DashboardOriginalKpis
+  kpisAnoAnterior: DashboardOriginalKpis
+  evolucaoMensal: DashboardOriginalEvolucao[]
+  evolucaoMensalAnoAnterior: DashboardOriginalEvolucaoAnoAnterior[]
+  kpisPorTipo: DashboardOriginalKpiTipo[]
+  totalVendas: number
+  segmentos: DashboardOriginalSegmento[]
+  projetos: DashboardOriginalProjeto[]
+  clientesTop: DashboardOriginalClienteTop[]
+  orcamentoKpis: DashboardOriginalOrcamentoKpis
+  orcamentoMensal: DashboardOriginalOrcamentoMensal[]
+}
+
+function appendDashboardFiltros(params: URLSearchParams, filtros: DashboardOriginalFiltros = {}) {
+  params.set('dataInicio', filtros.dataInicio || '2026-01-01')
+  params.set('dataFim', filtros.dataFim || '2026-12-31')
+  appendArrayParam(params, 'mercados', filtros.mercados ?? (filtros.mercado ? [filtros.mercado] : undefined))
+  appendArrayParam(params, 'vendedores', filtros.vendedores ?? (filtros.vendedor ? [filtros.vendedor] : undefined))
+  appendArrayParam(params, 'projetos', filtros.projetos ?? (filtros.projeto ? [filtros.projeto] : undefined))
+  appendArrayParam(params, 'gruposProduto', filtros.gruposProduto ?? (filtros.grupoProduto ? [filtros.grupoProduto] : undefined))
+  appendArrayParam(params, 'tiposReceita', filtros.tiposReceita ?? (filtros.tipoReceita ? [filtros.tipoReceita] : undefined))
+  if (filtros.uf) params.set('uf', filtros.uf)
+  if (filtros.codParc != null) params.set('codParc', String(filtros.codParc))
+  if (filtros.codProduto != null) params.set('codProduto', String(filtros.codProduto))
+}
+
+export async function getDashboardOriginalResumo(filtros: DashboardOriginalFiltros = {}, limitClientes = 50): Promise<DashboardOriginalResumo> {
+  const params = new URLSearchParams()
+  appendDashboardFiltros(params, filtros)
+  params.set('limitClientes', String(limitClientes))
+  return apiRequest<DashboardOriginalResumo>(`/api/dashboard-original/resumo?${params.toString()}`)
+}
+
+export async function getDashboardOriginalDrilldown(tipoReceita: string, filtros: DashboardOriginalFiltros = {}): Promise<DashboardOriginalDrilldown[]> {
+  const params = new URLSearchParams()
+  appendDashboardFiltros(params, filtros)
+  return apiRequest<DashboardOriginalDrilldown[]>(`/api/dashboard-original/drilldown/${encodeURIComponent(tipoReceita)}?${params.toString()}`)
+}
+
+export async function getDashboardOriginalClienteMix(codParc: number, filtros: DashboardOriginalFiltros = {}, limit = 30): Promise<DashboardOriginalClienteMix[]> {
+  const params = new URLSearchParams()
+  appendDashboardFiltros(params, filtros)
+  params.set('limit', String(limit))
+  return apiRequest<DashboardOriginalClienteMix[]>(`/api/dashboard-original/clientes/${codParc}/mix?${params.toString()}`)
+}
+
+export async function getDashboardOriginalFiltrosDisponiveis(): Promise<DashboardOriginalFiltrosDisponiveis> {
+  return apiRequest<DashboardOriginalFiltrosDisponiveis>('/api/dashboard-original/filtros-disponiveis')
 }

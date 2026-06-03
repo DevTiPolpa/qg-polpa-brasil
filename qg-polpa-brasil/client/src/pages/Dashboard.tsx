@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { trpc } from "@/lib/trpc";
+import { useQuery } from "@tanstack/react-query";
+import { getDashboardOriginalClienteMix, getDashboardOriginalDrilldown, getDashboardOriginalResumo, type DashboardOriginalFiltros } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -147,10 +148,11 @@ function DrillDownModal({
   const [busca, setBusca] = useState("");
   const [expandido, setExpandido] = useState<number | null>(null);
 
-  const { data, isLoading } = trpc.dashboard.drillDown.useQuery(
-    { tipoReceita: tipoReceita ?? "", filtros },
-    { enabled: open && !!tipoReceita }
-  );
+  const { data = [], isLoading } = useQuery({
+    queryKey: ["dashboard-original-drilldown", tipoReceita, filtros],
+    queryFn: () => getDashboardOriginalDrilldown(tipoReceita ?? "", filtros as DashboardOriginalFiltros),
+    enabled: open && !!tipoReceita,
+  });
 
   // Agrupa por cliente, produtos ordenados por faturamento desc
   const porCliente = useMemo(() => {
@@ -425,10 +427,11 @@ function ClienteTopRow({ cli, i, totalFat, onNavigate, filtrosCombinados }: {
   filtrosCombinados?: Record<string, any>;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const { data: mix, isLoading: loadingMix } = trpc.clientes.mix.useQuery(
-    { codParc: cli.codParc!, filtros: filtrosCombinados as any },
-    { enabled: expanded && !!cli.codParc }
-  );
+  const { data: mix = [], isLoading: loadingMix } = useQuery({
+    queryKey: ["dashboard-original-cliente-mix", cli.codParc, filtrosCombinados],
+    queryFn: () => getDashboardOriginalClienteMix(cli.codParc!, filtrosCombinados as DashboardOriginalFiltros),
+    enabled: expanded && !!cli.codParc,
+  });
   const fat = Number(cli.faturamento);
   const pct = totalFat > 0 ? (fat / totalFat) * 100 : 0;
   const color = CLI_COLORS[i % CLI_COLORS.length];
@@ -545,17 +548,25 @@ export default function Dashboard() {
     [filtros, tipoReceitaFiltro, projetoFiltroLocal]
   );
 
-  const { data: kpis, isLoading: loadingKpis } = trpc.dashboard.kpis.useQuery(filtrosCombinados);
-  const { data: evolucao, isLoading: loadingEvolucao } = trpc.dashboard.evolucaoMensal.useQuery(filtrosCombinados);
-  const { data: kpisTipo } = trpc.dashboard.kpisPorTipo.useQuery(filtrosCombinados);
-  const { data: totalVendas } = trpc.dashboard.totalVendas.useQuery();
-  const { data: segmentosData, isLoading: loadingSegmentos } = trpc.dashboard.segmentos.useQuery(filtrosCombinados);
-  const { data: projetosData } = trpc.dashboard.projetos.useQuery(filtrosCombinados);
-  const { data: clientesTopData } = trpc.dashboard.clientesTop.useQuery(filtrosCombinados);
-  const { data: evolucaoAnt } = trpc.dashboard.evolucaoMensalAnoAnterior.useQuery(filtrosCombinados);
-  const { data: kpisAnt } = trpc.dashboard.kpisAnoAnterior.useQuery(filtrosCombinados);
-  const { data: orcamentoKpis } = trpc.dashboard.orcamentoKpis.useQuery(filtrosCombinados);
-  const { data: orcamentoMensal } = trpc.dashboard.orcamentoMensal.useQuery(filtrosCombinados);
+  const { data: resumo, isLoading: loadingResumo } = useQuery({
+    queryKey: ["dashboard-original-resumo", filtrosCombinados],
+    queryFn: () => getDashboardOriginalResumo(filtrosCombinados as DashboardOriginalFiltros, 50),
+  });
+
+  const kpis = resumo?.kpis;
+  const evolucao = resumo?.evolucaoMensal ?? [];
+  const kpisTipo = resumo?.kpisPorTipo ?? [];
+  const totalVendas = resumo?.totalVendas ?? 0;
+  const segmentosData = resumo?.segmentos ?? [];
+  const projetosData = resumo?.projetos ?? [];
+  const clientesTopData = resumo?.clientesTop ?? [];
+  const evolucaoAnt = resumo?.evolucaoMensalAnoAnterior ?? [];
+  const kpisAnt = resumo?.kpisAnoAnterior;
+  const orcamentoKpis = resumo?.orcamentoKpis;
+  const orcamentoMensal = resumo?.orcamentoMensal ?? [];
+  const loadingKpis = loadingResumo;
+  const loadingEvolucao = loadingResumo;
+  const loadingSegmentos = loadingResumo;
 
   // Mapa do orçamento: mes (YYYY-MM) → { fatOrc, volOrc }
   const orcMap = new Map<string, { fatOrc: number; volOrc: number }>();
@@ -610,7 +621,7 @@ export default function Dashboard() {
       color: TIPO_COLOR_MAP[k.tipoReceita ?? ""] ?? CHART_COLORS[0],
     }));
 
-  const hasData = (totalVendas ?? 0) > 0;
+  const hasData = loadingResumo || (totalVendas ?? 0) > 0;
   const temDevolucao = (kpis?.faturamentoDevolucao ?? 0) > 0;
 
   // Clique em barra do gráfico mensal → filtra pelo mês
@@ -1084,7 +1095,7 @@ export default function Dashboard() {
         open={!!drillDownTipo}
         onClose={() => setDrillDownTipo(null)}
         tipoReceita={drillDownTipo}
-        filtros={filtros}
+        filtros={filtrosCombinados}
       />
     </div>
   );
