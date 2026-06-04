@@ -1,8 +1,15 @@
 import { useState } from 'react'
-import { trpc } from '../lib/trpc'
+import { useQuery } from '@tanstack/react-query'
 import FiltrosGlobais, { type Filtros } from '../components/FiltrosGlobais'
-import { formatCurrency, formatNumber } from '../lib/utils'
+import { formatCurrency } from '../lib/utils'
 import { History, ChevronRight, ChevronDown, Camera, AlertCircle } from 'lucide-react'
+import {
+  getSnapshotDatas,
+  getSnapshotHistorico,
+  getSnapshotHistoricoProdutos,
+  type SnapshotClienteRow,
+  type SnapshotProdutoRow,
+} from '../lib/api'
 
 const DEFAULT_FILTROS: Filtros = { dataInicio: '2026-01-01', dataFim: '2026-12-31' }
 
@@ -49,12 +56,14 @@ function ValCell({ valor, prev, highlight }: { valor: number; prev: number | nul
 }
 
 // Linha de cliente (expansível)
-function ClienteRow({ row, dates, filtros }: { row: any; dates: string[]; filtros: Filtros }) {
+function ClienteRow({ row, dates, filtros }: { row: SnapshotClienteRow; dates: string[]; filtros: Filtros }) {
   const [expanded, setExpanded] = useState(false)
-  const { data: detalhe } = trpc.snapshots.historicoProdutos.useQuery(
-    { codParc: row.codParc, filtros },
-    { enabled: expanded }
-  )
+  const { data: detalhe } = useQuery({
+    queryKey: ['snapshot', 'historico-produtos', row.codParc, filtros],
+    queryFn: () => getSnapshotHistoricoProdutos(row.codParc, filtros),
+    enabled: expanded,
+    staleTime: 60_000,
+  })
 
   const allValues = [
     ...dates.map(d => row.snapshots[d]?.valor ?? 0),
@@ -106,7 +115,7 @@ function ClienteRow({ row, dates, filtros }: { row: any; dates: string[]; filtro
       </tr>
 
       {/* Linhas de produto (expansão) */}
-      {expanded && (detalhe?.rows ?? []).map((p: any) => {
+      {expanded && (detalhe?.rows ?? []).map((p: SnapshotProdutoRow) => {
         const pAllValues = [
           ...dates.map(d => p.snapshots[d]?.valor ?? 0),
           p.currValor,
@@ -149,8 +158,16 @@ function ClienteRow({ row, dates, filtros }: { row: any; dates: string[]; filtro
 export default function SnapshotComparativo() {
   const [filtros, setFiltros] = useState<Filtros>(DEFAULT_FILTROS)
 
-  const { data: info } = trpc.snapshots.info.useQuery()
-  const { data, isLoading } = trpc.snapshots.historico.useQuery(filtros)
+  const { data: info } = useQuery({
+    queryKey: ['snapshot', 'datas'],
+    queryFn: getSnapshotDatas,
+    staleTime: 60_000,
+  })
+  const { data, isLoading } = useQuery({
+    queryKey: ['snapshot', 'historico', filtros],
+    queryFn: () => getSnapshotHistorico(filtros),
+    staleTime: 60_000,
+  })
 
   const dates  = data?.dates ?? []
   const rows   = data?.rows  ?? []
@@ -250,7 +267,7 @@ export default function SnapshotComparativo() {
                         ))}
                       </tr>
                     ))
-                  : rows.map(row => (
+                  : rows.map((row: SnapshotClienteRow) => (
                       <ClienteRow key={row.codParc} row={row} dates={dates} filtros={filtros} />
                     ))
                 }
