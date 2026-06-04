@@ -1,7 +1,14 @@
-import { useState, useMemo } from 'react'
-import { trpc } from '../lib/trpc'
+import { Fragment, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { formatCurrency, formatKg } from '../lib/utils'
 import { ChevronDown, ChevronRight, TrendingUp, TrendingDown, Package, DollarSign } from 'lucide-react'
+import {
+  getRecorrentesFiltros,
+  getRecorrentesKpis,
+  getRecorrentesProdutos,
+  getRecorrentesTabela,
+  type RecorrentesFiltros,
+} from '../lib/api'
 
 const DEFAULT_INI = '2026-01-01'
 const DEFAULT_FIM = '2026-12-31'
@@ -51,12 +58,16 @@ function KpiCard({ label, value, sub, icon: Icon, color }: {
   )
 }
 
-function ProdutosRow({ codParc, filtros }: { codParc: number; filtros: any }) {
-  const { data: produtos, isLoading } = trpc.recorrentes.produtos.useQuery({ codParc, ...filtros })
+function ProdutosRow({ codParc, filtros }: { codParc: number; filtros: RecorrentesFiltros }) {
+  const { data: produtos, isLoading } = useQuery({
+    queryKey: ['recorrentes', 'produtos', codParc, filtros],
+    queryFn: () => getRecorrentesProdutos(codParc, filtros),
+    staleTime: 60_000,
+  })
   const totalVolReal = (produtos ?? []).reduce((s, p) => s + Number(p.volAtual), 0)
 
   if (isLoading) return (
-    <tr><td colSpan={10} className="px-4 py-2 text-center text-slate-500 text-xs">Carregando...</td></tr>
+    <tr><td colSpan={10} className="px-4 py-2 text-center text-slate-500 text-xs">Carregando produtos...</td></tr>
   )
   return (
     <>
@@ -100,17 +111,29 @@ export default function RecorrentesRealOrcado() {
   const [sortKey,    setSortKey]    = useState<SortKey>('volAtual')
   const [sortDir,    setSortDir]    = useState<SortDir>('desc')
 
-  const { data: opFiltros } = trpc.recorrentes.filtros.useQuery()
+  const { data: opFiltros } = useQuery({
+    queryKey: ['recorrentes', 'filtros'],
+    queryFn: getRecorrentesFiltros,
+    staleTime: 5 * 60_000,
+  })
 
-  const filtros = useMemo(() => ({
+  const filtros = useMemo<RecorrentesFiltros>(() => ({
     dataInicio: dataInicio || undefined,
     dataFim:    dataFim    || undefined,
     mercados:   mercado    ? [mercado]  : undefined,
     vendedores: vendedor   ? [vendedor] : undefined,
   }), [dataInicio, dataFim, mercado, vendedor])
 
-  const { data: kpis,   isLoading: kpiLoad   } = trpc.recorrentes.kpis.useQuery(filtros)
-  const { data: tabela, isLoading: tabelaLoad } = trpc.recorrentes.tabela.useQuery(filtros)
+  const { data: kpis,   isLoading: kpiLoad   } = useQuery({
+    queryKey: ['recorrentes', 'kpis', filtros],
+    queryFn: () => getRecorrentesKpis(filtros),
+    staleTime: 60_000,
+  })
+  const { data: tabela, isLoading: tabelaLoad } = useQuery({
+    queryKey: ['recorrentes', 'tabela', filtros],
+    queryFn: () => getRecorrentesTabela(filtros),
+    staleTime: 60_000,
+  })
 
   const totalVolReal = useMemo(() => (tabela ?? []).reduce((s, r) => s + Number(r.volAtual), 0), [tabela])
   const totalFatReal = useMemo(() => (tabela ?? []).reduce((s, r) => s + Number(r.fatAtual), 0), [tabela])
@@ -167,7 +190,6 @@ export default function RecorrentesRealOrcado() {
         <p className="text-slate-400 text-sm mt-0.5">Comparativo entre faturamento realizado e orçamento do projeto Recorrentes</p>
       </div>
 
-      {/* Filtros */}
       <div className="flex flex-wrap gap-3 items-end bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3">
         <div className="flex flex-col gap-1">
           <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Data Início</label>
@@ -199,7 +221,6 @@ export default function RecorrentesRealOrcado() {
         )}
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard label="Faturamento Real" icon={DollarSign} color="border-l-green-500"
           value={kpiLoad ? '—' : formatCurrency(kpis?.fatAtual ?? 0)}
@@ -213,7 +234,6 @@ export default function RecorrentesRealOrcado() {
           value={kpiLoad ? '—' : formatKg(kpis?.orcKg ?? 0)} />
       </div>
 
-      {/* Tabela */}
       <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs min-w-[960px]">
@@ -239,8 +259,8 @@ export default function RecorrentesRealOrcado() {
                 const isOpen = expanded.has(row.codParc)
                 const fmt2 = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                 return (
-                  <>
-                    <tr key={row.codParc} onClick={() => toggle(row.codParc)}
+                  <Fragment key={row.codParc}>
+                    <tr onClick={() => toggle(row.codParc)}
                       className="hover:bg-slate-700/30 transition-colors cursor-pointer group">
                       <td className="px-3 py-2 text-white font-semibold min-w-[200px] max-w-[240px]">
                         <span className="flex items-center gap-1.5">
@@ -261,11 +281,10 @@ export default function RecorrentesRealOrcado() {
                       <td className={`px-2 py-2 text-right font-semibold whitespace-nowrap ${difColor(row.dif)}`}>{formatCurrency(row.dif)}</td>
                     </tr>
                     {isOpen && <ProdutosRow codParc={row.codParc} filtros={filtros} />}
-                  </>
+                  </Fragment>
                 )
               })}
 
-              {/* Totais */}
               {!tabelaLoad && sortedData.length > 0 && (() => {
                 const tVol  = sortedData.reduce((s, r) => s + r.vol, 0)
                 const tOrcKg = sortedData.reduce((s, r) => s + r.orcKg, 0)

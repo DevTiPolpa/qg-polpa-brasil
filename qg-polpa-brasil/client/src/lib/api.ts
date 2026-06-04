@@ -832,3 +832,73 @@ export async function getSnapshotHistoricoProdutos(codParc: number, filtros: Sna
 export async function criarSnapshotManual(): Promise<SnapshotCriarResponse> {
   return apiRequest<SnapshotCriarResponse>('/api/snapshot/criar', { method: 'POST' })
 }
+
+
+// ============================================================
+// Recorrentes R x O (/recorrentes) - API REST
+// ============================================================
+
+export type RecorrentesFiltros = {
+  dataInicio?: string
+  dataFim?: string
+  mercados?: string[]
+  vendedores?: string[]
+  codParc?: number | null
+}
+
+export type RecorrentesFiltrosDisponiveis = {
+  mercados: string[]
+  vendedores: string[]
+}
+
+export type RecorrentesKpis = {
+  fatAtual: number
+  volAtual: number
+  orcVal: number
+  orcKg: number
+}
+
+export type RecorrentesClienteRow = {
+  codParc: number
+  razaoSocial: string
+  volAtual: number
+  orcKg: number
+  fatAtual: number
+  orcVal: number
+}
+
+export type RecorrentesProdutoRow = {
+  codProduto: number
+  nomeProduto: string
+  volAtual: number
+  orcKg: number
+  fatAtual: number
+  orcVal: number
+}
+
+function buildRecorrentesParams(filtros: RecorrentesFiltros = {}) {
+  const params = new URLSearchParams()
+  params.set('dataInicio', filtros.dataInicio || '2026-01-01')
+  params.set('dataFim', filtros.dataFim || '2026-12-31')
+  appendArrayParam(params, 'mercados', filtros.mercados)
+  appendArrayParam(params, 'vendedores', filtros.vendedores)
+  if (filtros.codParc != null) params.set('codParc', String(filtros.codParc))
+  const query = params.toString()
+  return query ? `?${query}` : ''
+}
+
+export async function getRecorrentesFiltros(): Promise<RecorrentesFiltrosDisponiveis> {
+  return apiRequest<RecorrentesFiltrosDisponiveis>('/api/recorrentes/filtros')
+}
+
+export async function getRecorrentesKpis(filtros: RecorrentesFiltros = {}): Promise<RecorrentesKpis> {
+  return apiRequest<RecorrentesKpis>(`/api/recorrentes/kpis${buildRecorrentesParams(filtros)}`)
+}
+
+export async function getRecorrentesTabela(filtros: RecorrentesFiltros = {}): Promise<RecorrentesClienteRow[]> {
+  return apiRequest<RecorrentesClienteRow[]>(`/api/recorrentes/tabela${buildRecorrentesParams(filtros)}`)
+}
+
+export async function getRecorrentesProdutos(codParc: number, filtros: RecorrentesFiltros = {}): Promise<RecorrentesProdutoRow[]> {
+  return apiRequest<RecorrentesProdutoRow[]>(`/api/recorrentes/produtos/${codParc}${buildRecorrentesParams(filtros)}`)
+}
