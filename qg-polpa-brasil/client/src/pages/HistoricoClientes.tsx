@@ -3,7 +3,17 @@ import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts'
-import { trpc } from '../lib/trpc'
+import { useQuery } from '@tanstack/react-query'
+import {
+  getHistoricoClientesFiltros,
+  getHistoricoClientesKpis,
+  getHistoricoClientesLista,
+  getHistoricoClientesEvolucaoMensal,
+  getHistoricoClientesPorEstado,
+  getHistoricoClientesPorSegmento,
+  getHistoricoClienteProdutos,
+  type HistoricoClientesFiltros,
+} from '../lib/api'
 import {
   DollarSign, Percent, Weight, Tag, Package, Users,
   RefreshCw, X, ChevronDown, ChevronRight,
@@ -246,18 +256,21 @@ function ClienteRow({ c, rank, applied, isExpanded, onToggle, dimmed, selectedPr
   selectedProductCode?: string | null
   onProductClick?: (code: string, name: string) => void
 }) {
-  const { data: produtos, isLoading: prodLoading } = trpc.historicoClientes.clienteProdutos.useQuery(
-    {
-      anos: applied.anos,
-      meses: applied.meses.length ? applied.meses : undefined,
-      codParcs: applied.codParcs.length ? applied.codParcs : undefined,
-      mercados: applied.mercados.length ? applied.mercados : undefined,
-      gruposProduto: applied.gruposProduto.length ? applied.gruposProduto : undefined,
-      vendedores: applied.vendedores.length ? applied.vendedores : undefined,
-      codParcDetalhe: c.codParc,
-    },
-    { enabled: isExpanded, staleTime: 60_000 }
-  )
+  const produtosFiltros = useMemo<HistoricoClientesFiltros>(() => ({
+    anos: applied.anos,
+    meses: applied.meses.length ? applied.meses : undefined,
+    codParcs: applied.codParcs.length ? applied.codParcs : undefined,
+    mercados: applied.mercados.length ? applied.mercados : undefined,
+    gruposProduto: applied.gruposProduto.length ? applied.gruposProduto : undefined,
+    vendedores: applied.vendedores.length ? applied.vendedores : undefined,
+  }), [applied])
+
+  const { data: produtos, isLoading: prodLoading } = useQuery({
+    queryKey: ['historico-clientes', 'cliente-produtos', c.codParc, produtosFiltros],
+    queryFn: () => getHistoricoClienteProdutos(c.codParc, produtosFiltros),
+    enabled: isExpanded,
+    staleTime: 60_000,
+  })
 
   return (
     <>
@@ -353,7 +366,7 @@ function ClienteRow({ c, rank, applied, isExpanded, onToggle, dimmed, selectedPr
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-function toBackend(f: FiltrosH) {
+function toBackend(f: FiltrosH): HistoricoClientesFiltros {
   return {
     anos: f.anos,
     meses: f.meses.length ? f.meses : undefined,
@@ -364,9 +377,9 @@ function toBackend(f: FiltrosH) {
   }
 }
 
-function withMonth<T extends Record<string, unknown>>(b: T, mes: number | null): T {
+function withMonth(b: HistoricoClientesFiltros, mes: number | null): HistoricoClientesFiltros {
   if (mes === null) return b
-  return { ...b, meses: [mes] } as T
+  return { ...b, meses: [mes] }
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -388,7 +401,11 @@ export default function HistoricoClientes() {
   // product cross-filter: clicar em produto na expansão do cliente filtra todos os painéis
   const [productCrossFilter, setProductCrossFilter] = useState<{ code: string; name: string } | null>(null)
 
-  const { data: filtrosData } = trpc.historicoClientes.filtros.useQuery(undefined, { staleTime: 60_000 })
+  const { data: filtrosData } = useQuery({
+    queryKey: ['historico-clientes', 'filtros'],
+    queryFn: getHistoricoClientesFiltros,
+    staleTime: 60_000,
+  })
 
   const anosOpts = useMemo(() => {
     const av = filtrosData?.anos ?? []
@@ -428,20 +445,40 @@ export default function HistoricoClientes() {
     return productCode ? { ...base, codProdutos: [productCode] } : base
   }, [applied, productCode])
 
-  const { data: kpis, isLoading: kpisLoading } =
-    trpc.historicoClientes.kpis.useQuery(withMonth(kpisBackend, monthCrossFilter), queryOpts)
+  const kpisQueryInput = useMemo(() => withMonth(kpisBackend, monthCrossFilter), [kpisBackend, monthCrossFilter])
+  const clientesQueryInput = useMemo(() => withMonth(clientesBackend, monthCrossFilter), [clientesBackend, monthCrossFilter])
+  const evolucaoQueryInput = useMemo(() => withMonth(evolucaoBackend, monthCrossFilter), [evolucaoBackend, monthCrossFilter])
+  const donutQueryInput = useMemo(() => withMonth(donutBackend, monthCrossFilter), [donutBackend, monthCrossFilter])
 
-  const { data: clientes, isLoading: clientesLoading } =
-    trpc.historicoClientes.listaClientes.useQuery(withMonth(clientesBackend, monthCrossFilter), queryOpts)
+  const { data: kpis, isLoading: kpisLoading } = useQuery({
+    queryKey: ['historico-clientes', 'kpis', kpisQueryInput],
+    queryFn: () => getHistoricoClientesKpis(kpisQueryInput),
+    ...queryOpts,
+  })
 
-  const { data: evolucao } =
-    trpc.historicoClientes.evolucaoMensal.useQuery(withMonth(evolucaoBackend, monthCrossFilter), queryOpts)
+  const { data: clientes, isLoading: clientesLoading } = useQuery({
+    queryKey: ['historico-clientes', 'clientes', clientesQueryInput],
+    queryFn: () => getHistoricoClientesLista(clientesQueryInput),
+    ...queryOpts,
+  })
 
-  const { data: estados } =
-    trpc.historicoClientes.porEstado.useQuery(withMonth(donutBackend, monthCrossFilter), queryOpts)
+  const { data: evolucao } = useQuery({
+    queryKey: ['historico-clientes', 'evolucao-mensal', evolucaoQueryInput],
+    queryFn: () => getHistoricoClientesEvolucaoMensal(evolucaoQueryInput),
+    ...queryOpts,
+  })
 
-  const { data: segmentos } =
-    trpc.historicoClientes.porSegmento.useQuery(withMonth(donutBackend, monthCrossFilter), queryOpts)
+  const { data: estados } = useQuery({
+    queryKey: ['historico-clientes', 'por-estado', donutQueryInput],
+    queryFn: () => getHistoricoClientesPorEstado(donutQueryInput),
+    ...queryOpts,
+  })
+
+  const { data: segmentos } = useQuery({
+    queryKey: ['historico-clientes', 'por-segmento', donutQueryInput],
+    queryFn: () => getHistoricoClientesPorSegmento(donutQueryInput),
+    ...queryOpts,
+  })
 
   function toggleCliente(codParc: number) {
     setExpandedParc(p => {

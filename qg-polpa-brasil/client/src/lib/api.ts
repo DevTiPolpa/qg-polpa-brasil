@@ -621,3 +621,214 @@ export async function getNovosProjetosLista(filtros: NovosProjetosFiltros = {}):
 export async function getNovosProjetosDrilldown(mes: string, filtros: NovosProjetosFiltros = {}): Promise<NovosProjetosItem[]> {
   return apiRequest<NovosProjetosItem[]>(`/api/novos-projetos/drilldown${buildNovosProjetosParams(filtros, { mes })}`)
 }
+
+// ============================================================
+// Histórico Clientes / Produtos (/historico-clientes) - API REST
+// ============================================================
+
+export type HistoricoClientesFiltros = {
+  anos?: number[]
+  meses?: number[]
+  codParcs?: number[]
+  mercados?: string[]
+  gruposProduto?: string[]
+  vendedores?: string[]
+  ufs?: string[]
+  codProdutos?: string[]
+}
+
+export type HistoricoClientesFiltrosDisponiveis = {
+  anos: number[]
+  clientes: Array<{ codParc: number; razaoSocial: string }>
+  mercados: string[]
+  gruposProduto: string[]
+  vendedores: string[]
+}
+
+export type HistoricoClientesKpis = {
+  totalValor: number
+  totalVolume: number
+  precoMedio: number
+  qtdProdutos: number
+  qtdClientes: number
+  pctFaturamento: number
+  pctVolume: number
+}
+
+export type HistoricoClienteItem = {
+  codParc: number
+  razaoSocial: string
+  valor: number
+  volume: number
+  precoMedio: number
+  qtdProdutos: number
+  pctValor: number
+  pctVolume: number
+}
+
+export type HistoricoClientesEvolucaoItem = {
+  mes: number
+  volume: number
+  precoMedio: number
+  valor: number
+}
+
+export type HistoricoClientesEstadoItem = {
+  uf: string
+  valor: number
+  volume: number
+  pct: number
+}
+
+export type HistoricoClientesSegmentoItem = {
+  segmento: string
+  valor: number
+  volume: number
+  pct: number
+}
+
+export type HistoricoClienteProdutoItem = {
+  codProduto: string
+  nomeProduto: string
+  volume: number
+  valor: number
+  precoMedio: number
+  dtUltimaCompra: string | null
+}
+
+function appendHistoricoClientesArrayParam(params: URLSearchParams, key: string, values?: Array<string | number> | null) {
+  for (const value of values ?? []) {
+    if (value !== null && value !== undefined && String(value).trim() !== '') {
+      params.append(key, String(value).trim())
+    }
+  }
+}
+
+function buildHistoricoClientesParams(filtros: HistoricoClientesFiltros = {}) {
+  const params = new URLSearchParams()
+  appendHistoricoClientesArrayParam(params, 'anos', filtros.anos)
+  appendHistoricoClientesArrayParam(params, 'meses', filtros.meses)
+  appendHistoricoClientesArrayParam(params, 'codParcs', filtros.codParcs)
+  appendHistoricoClientesArrayParam(params, 'mercados', filtros.mercados)
+  appendHistoricoClientesArrayParam(params, 'gruposProduto', filtros.gruposProduto)
+  appendHistoricoClientesArrayParam(params, 'vendedores', filtros.vendedores)
+  appendHistoricoClientesArrayParam(params, 'ufs', filtros.ufs)
+  appendHistoricoClientesArrayParam(params, 'codProdutos', filtros.codProdutos)
+  const query = params.toString()
+  return query ? `?${query}` : ''
+}
+
+export async function getHistoricoClientesFiltros(): Promise<HistoricoClientesFiltrosDisponiveis> {
+  return apiRequest<HistoricoClientesFiltrosDisponiveis>('/api/historico-clientes/filtros')
+}
+
+export async function getHistoricoClientesKpis(filtros: HistoricoClientesFiltros = {}): Promise<HistoricoClientesKpis> {
+  return apiRequest<HistoricoClientesKpis>(`/api/historico-clientes/kpis${buildHistoricoClientesParams(filtros)}`)
+}
+
+export async function getHistoricoClientesLista(filtros: HistoricoClientesFiltros = {}): Promise<HistoricoClienteItem[]> {
+  return apiRequest<HistoricoClienteItem[]>(`/api/historico-clientes/clientes${buildHistoricoClientesParams(filtros)}`)
+}
+
+export async function getHistoricoClientesEvolucaoMensal(filtros: HistoricoClientesFiltros = {}): Promise<HistoricoClientesEvolucaoItem[]> {
+  return apiRequest<HistoricoClientesEvolucaoItem[]>(`/api/historico-clientes/evolucao-mensal${buildHistoricoClientesParams(filtros)}`)
+}
+
+export async function getHistoricoClientesPorEstado(filtros: HistoricoClientesFiltros = {}): Promise<HistoricoClientesEstadoItem[]> {
+  return apiRequest<HistoricoClientesEstadoItem[]>(`/api/historico-clientes/por-estado${buildHistoricoClientesParams(filtros)}`)
+}
+
+export async function getHistoricoClientesPorSegmento(filtros: HistoricoClientesFiltros = {}): Promise<HistoricoClientesSegmentoItem[]> {
+  return apiRequest<HistoricoClientesSegmentoItem[]>(`/api/historico-clientes/por-segmento${buildHistoricoClientesParams(filtros)}`)
+}
+
+export async function getHistoricoClienteProdutos(codParc: number, filtros: HistoricoClientesFiltros = {}): Promise<HistoricoClienteProdutoItem[]> {
+  return apiRequest<HistoricoClienteProdutoItem[]>(`/api/historico-clientes/clientes/${codParc}/produtos${buildHistoricoClientesParams(filtros)}`)
+}
+
+
+
+// ============================================================
+// Comparativo Semanal / Snapshot (/snapshot) - API REST
+// ============================================================
+
+export type SnapshotFiltros = {
+  dataInicio?: string
+  dataFim?: string
+  mercados?: string[]
+  vendedores?: string[]
+  projetos?: string[]
+  gruposProduto?: string[]
+  tiposReceita?: string[]
+  uf?: string | null
+  codParc?: number | null
+}
+
+export type SnapshotInfo = {
+  snapshotDate: string
+  totalRows: number
+}
+
+export type SnapshotValorVolume = {
+  valor: number
+  volume: number
+}
+
+export type SnapshotClienteRow = {
+  codParc: number
+  razaoSocial: string
+  snapshots: Record<string, SnapshotValorVolume>
+  currValor: number
+  currVolume: number
+  dtEntrega: string | null
+}
+
+export type SnapshotProdutoRow = {
+  codProduto: number
+  nomeProduto: string
+  snapshots: Record<string, SnapshotValorVolume>
+  currValor: number
+  currVolume: number
+  dtEntrega: string | null
+}
+
+export type SnapshotHistoricoResponse<T> = {
+  dates: string[]
+  rows: T[]
+}
+
+export type SnapshotCriarResponse = {
+  inserted: number
+  snapshotDate: string
+}
+
+function buildSnapshotParams(filtros: SnapshotFiltros = {}) {
+  const params = new URLSearchParams()
+  if (filtros.dataInicio) params.set('dataInicio', filtros.dataInicio)
+  if (filtros.dataFim) params.set('dataFim', filtros.dataFim)
+  if (filtros.uf) params.set('uf', filtros.uf)
+  if (filtros.codParc != null) params.set('codParc', String(filtros.codParc))
+  appendArrayParam(params, 'mercados', filtros.mercados)
+  appendArrayParam(params, 'vendedores', filtros.vendedores)
+  appendArrayParam(params, 'projetos', filtros.projetos)
+  appendArrayParam(params, 'gruposProduto', filtros.gruposProduto)
+  appendArrayParam(params, 'tiposReceita', filtros.tiposReceita)
+  const query = params.toString()
+  return query ? `?${query}` : ''
+}
+
+export async function getSnapshotDatas(): Promise<SnapshotInfo[]> {
+  return apiRequest<SnapshotInfo[]>('/api/snapshot/datas')
+}
+
+export async function getSnapshotHistorico(filtros: SnapshotFiltros = {}): Promise<SnapshotHistoricoResponse<SnapshotClienteRow>> {
+  return apiRequest<SnapshotHistoricoResponse<SnapshotClienteRow>>(`/api/snapshot/historico${buildSnapshotParams(filtros)}`)
+}
+
+export async function getSnapshotHistoricoProdutos(codParc: number, filtros: SnapshotFiltros = {}): Promise<SnapshotHistoricoResponse<SnapshotProdutoRow>> {
+  return apiRequest<SnapshotHistoricoResponse<SnapshotProdutoRow>>(`/api/snapshot/historico-produtos/${codParc}${buildSnapshotParams(filtros)}`)
+}
+
+export async function criarSnapshotManual(): Promise<SnapshotCriarResponse> {
+  return apiRequest<SnapshotCriarResponse>('/api/snapshot/criar', { method: 'POST' })
+}
