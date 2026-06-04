@@ -525,3 +525,99 @@ export async function getDashboardOriginalClienteMix(codParc: number, filtros: D
 export async function getDashboardOriginalFiltrosDisponiveis(): Promise<DashboardOriginalFiltrosDisponiveis> {
   return apiRequest<DashboardOriginalFiltrosDisponiveis>('/api/dashboard-original/filtros-disponiveis')
 }
+
+
+// ============================================================
+// Novos Projetos (/projetos) - API REST
+// ============================================================
+
+export type NovosProjetosFiltros = {
+  dataInicio?: string
+  dataFim?: string
+  mercados?: string[]
+  vendedores?: string[]
+  projetos?: string[]
+  gruposProduto?: string[]
+  tiposReceita?: string[]
+  uf?: string | null
+  codParc?: number | null
+  codProduto?: number | null
+  modoCard?: 'abertos' | 'totais' | null
+}
+
+export type NovosProjetosKpis = {
+  projetosAbertos: number
+  projetosTotais: number
+  faturamentoTotal: number
+  taxaConversao: number
+  taxaConversaoTotal: number
+  taxaConversaoConvertidos: number
+  ticketMedio: number
+}
+
+export type NovosProjetosPorMesItem = {
+  mes: string
+  projetos: number
+  faturamento: number
+}
+
+export type NovosProjetosItem = {
+  codParc: number
+  razaoSocial: string
+  codProduto: string
+  nomeProduto: string
+  nomeVendedor: string
+  dtPrimeiro: string
+  mesAtualCiclo: number
+  ultimaCompra: string
+  volumeTotal: number
+  faturamentoTotal: number
+  status: string
+  origem: string
+}
+
+function appendNovosProjetosArrayParam(params: URLSearchParams, key: string, values?: string[] | null) {
+  for (const value of values ?? []) {
+    if (value) params.append(key, value)
+  }
+}
+
+function buildNovosProjetosParams(filtros: NovosProjetosFiltros = {}, extra?: Record<string, string | number | null | undefined>) {
+  const params = new URLSearchParams()
+
+  if (filtros.dataInicio) params.set('dataInicio', filtros.dataInicio)
+  if (filtros.dataFim) params.set('dataFim', filtros.dataFim)
+  if (filtros.uf) params.set('uf', filtros.uf)
+  if (filtros.codParc) params.set('codParc', String(filtros.codParc))
+  if (filtros.codProduto) params.set('codProduto', String(filtros.codProduto))
+  if (filtros.modoCard) params.set('modoCard', filtros.modoCard)
+
+  appendNovosProjetosArrayParam(params, 'mercados', filtros.mercados)
+  appendNovosProjetosArrayParam(params, 'vendedores', filtros.vendedores)
+  appendNovosProjetosArrayParam(params, 'projetos', filtros.projetos)
+  appendNovosProjetosArrayParam(params, 'gruposProduto', filtros.gruposProduto)
+  appendNovosProjetosArrayParam(params, 'tiposReceita', filtros.tiposReceita)
+
+  for (const [key, value] of Object.entries(extra ?? {})) {
+    if (value !== null && value !== undefined && value !== '') params.set(key, String(value))
+  }
+
+  const query = params.toString()
+  return query ? `?${query}` : ''
+}
+
+export async function getNovosProjetosKpis(filtros: NovosProjetosFiltros = {}): Promise<NovosProjetosKpis> {
+  return apiRequest<NovosProjetosKpis>(`/api/novos-projetos/kpis${buildNovosProjetosParams(filtros)}`)
+}
+
+export async function getNovosProjetosPorMes(filtros: NovosProjetosFiltros = {}): Promise<NovosProjetosPorMesItem[]> {
+  return apiRequest<NovosProjetosPorMesItem[]>(`/api/novos-projetos/por-mes${buildNovosProjetosParams(filtros)}`)
+}
+
+export async function getNovosProjetosLista(filtros: NovosProjetosFiltros = {}): Promise<NovosProjetosItem[]> {
+  return apiRequest<NovosProjetosItem[]>(`/api/novos-projetos/lista${buildNovosProjetosParams(filtros)}`)
+}
+
+export async function getNovosProjetosDrilldown(mes: string, filtros: NovosProjetosFiltros = {}): Promise<NovosProjetosItem[]> {
+  return apiRequest<NovosProjetosItem[]>(`/api/novos-projetos/drilldown${buildNovosProjetosParams(filtros, { mes })}`)
+}
