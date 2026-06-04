@@ -7,7 +7,16 @@ import {
   TrendingUp, Target, CheckCircle, XCircle, Clock, Users,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
-import { trpc } from '../lib/trpc'
+import { useQuery } from '@tanstack/react-query'
+import {
+  getFunilVendasEvolucaoMensal,
+  getFunilVendasKpis,
+  getFunilVendasPorEtapa,
+  getFunilVendasPorPipeline,
+  getFunilVendasTopVendedores,
+  getFunilVendasVendedores,
+  type FunilEtapa,
+} from '../lib/api'
 import { formatCurrency, formatNumber, formatPercent, formatMes } from '../lib/utils'
 
 // ─── Cores ────────────────────────────────────────────────────────────────────
@@ -106,21 +115,23 @@ export default function FunilVendas() {
   const [selectedIds, setSelectedIds] = useState<number[] | undefined>(undefined)
   const [userId, setUserId]           = useState<number | undefined>(undefined)
 
-  const { data: crmVendedores } = trpc.funilCrm.vendedores.useQuery()
+  const { data: crmVendedores } = useQuery({
+    queryKey: ['funil-vendas', 'vendedores'],
+    queryFn: getFunilVendasVendedores,
+  })
 
   const input = { ...(selectedIds ? { pipelineIds: selectedIds } : {}), ...(userId != null ? { userId } : {}) }
-  const inputOrUndef = Object.keys(input).length > 0 ? input : undefined
 
-  const { data: kpis,        isLoading: loadKpis }     = trpc.funilCrm.kpis.useQuery(inputOrUndef)
-  const { data: porEtapa,    isLoading: loadEtapa }    = trpc.funilCrm.porEtapa.useQuery(inputOrUndef)
-  const { data: porPipeline, isLoading: loadPipeline } = trpc.funilCrm.porPipeline.useQuery(inputOrUndef)
-  const { data: vendedores,  isLoading: loadVend }     = trpc.funilCrm.topVendedores.useQuery(inputOrUndef)
-  const { data: evolucao,    isLoading: loadEvol }     = trpc.funilCrm.evolucaoMensal.useQuery(inputOrUndef)
+  const { data: kpis,        isLoading: loadKpis }     = useQuery({ queryKey: ['funil-vendas', 'kpis', input], queryFn: () => getFunilVendasKpis(input) })
+  const { data: porEtapa,    isLoading: loadEtapa }    = useQuery({ queryKey: ['funil-vendas', 'por-etapa', input], queryFn: () => getFunilVendasPorEtapa(input) })
+  const { data: porPipeline, isLoading: loadPipeline } = useQuery({ queryKey: ['funil-vendas', 'por-pipeline', input], queryFn: () => getFunilVendasPorPipeline(input) })
+  const { data: vendedores,  isLoading: loadVend }     = useQuery({ queryKey: ['funil-vendas', 'top-vendedores', input], queryFn: () => getFunilVendasTopVendedores(input) })
+  const { data: evolucao,    isLoading: loadEvol }     = useQuery({ queryKey: ['funil-vendas', 'evolucao-mensal', input], queryFn: () => getFunilVendasEvolucaoMensal(input) })
 
   const kpi = kpis?.[0]
 
   // Agrupa etapas por pipeline, respeitando a ordem definida
-  const etapasPorPipeline = sortEtapas(porEtapa ?? []).reduce<Record<string, typeof porEtapa>>((acc, e) => {
+  const etapasPorPipeline = sortEtapas(porEtapa ?? []).reduce<Record<string, FunilEtapa[]>>((acc, e) => {
     const key = e.pipeline ?? 'Comercial'
     if (!acc[key]) acc[key] = []
     acc[key]!.push(e)
