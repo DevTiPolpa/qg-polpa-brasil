@@ -902,3 +902,214 @@ export async function getRecorrentesTabela(filtros: RecorrentesFiltros = {}): Pr
 export async function getRecorrentesProdutos(codParc: number, filtros: RecorrentesFiltros = {}): Promise<RecorrentesProdutoRow[]> {
   return apiRequest<RecorrentesProdutoRow[]>(`/api/recorrentes/produtos/${codParc}${buildRecorrentesParams(filtros)}`)
 }
+
+// ============================================================
+// Funil de Vendas (/funil-vendas) - API REST
+// ============================================================
+
+export type FunilPipelineId = 0 | 31 | number
+
+export type FunilVendasFiltros = {
+  pipelineIds?: FunilPipelineId[]
+  userId?: number | null
+}
+
+export type FunilVendedor = {
+  id: number
+  nome: string
+}
+
+export type FunilKpis = {
+  emAndamento: number
+  valorPipeline: number
+  ganhos: number
+  valorGanho: number
+  perdidos: number
+  taxaConversao: number
+  diasMedioFechamento: number
+}
+
+export type FunilEtapa = {
+  etapa: string
+  pipeline: string
+  total: number
+  valorTotal: number
+  semantic: string
+  pipelineId: number
+  stageId: string
+}
+
+export type FunilPipelineResumo = {
+  pipeline: string
+  pipelineId: number
+  emAndamento: number
+  ganhos: number
+  perdidos: number
+  valorPipeline: number
+  taxaConversao: number
+}
+
+export type FunilTopVendedor = {
+  nome: string
+  emAndamento: number
+  ganhos: number
+  perdidos: number
+  valorPipeline: number
+  taxaConversao: number
+}
+
+export type FunilEvolucaoMensal = {
+  mes: string
+  abertos: number
+  ganhos: number
+  perdidos: number
+}
+
+function buildFunilVendasParams(filtros: FunilVendasFiltros = {}) {
+  const params = new URLSearchParams()
+  appendArrayParam(params, 'pipelineIds', filtros.pipelineIds?.map(String))
+  if (filtros.userId != null) params.set('userId', String(filtros.userId))
+  const query = params.toString()
+  return query ? `?${query}` : ''
+}
+
+export async function getFunilVendasVendedores(): Promise<FunilVendedor[]> {
+  return apiRequest<FunilVendedor[]>('/api/funil-vendas/vendedores')
+}
+
+export async function getFunilVendasKpis(filtros: FunilVendasFiltros = {}): Promise<FunilKpis[]> {
+  return apiRequest<FunilKpis[]>(`/api/funil-vendas/kpis${buildFunilVendasParams(filtros)}`)
+}
+
+export async function getFunilVendasPorEtapa(filtros: FunilVendasFiltros = {}): Promise<FunilEtapa[]> {
+  return apiRequest<FunilEtapa[]>(`/api/funil-vendas/por-etapa${buildFunilVendasParams(filtros)}`)
+}
+
+export async function getFunilVendasPorPipeline(filtros: FunilVendasFiltros = {}): Promise<FunilPipelineResumo[]> {
+  return apiRequest<FunilPipelineResumo[]>(`/api/funil-vendas/por-pipeline${buildFunilVendasParams(filtros)}`)
+}
+
+export async function getFunilVendasTopVendedores(filtros: FunilVendasFiltros = {}): Promise<FunilTopVendedor[]> {
+  return apiRequest<FunilTopVendedor[]>(`/api/funil-vendas/top-vendedores${buildFunilVendasParams(filtros)}`)
+}
+
+export async function getFunilVendasEvolucaoMensal(filtros: FunilVendasFiltros = {}): Promise<FunilEvolucaoMensal[]> {
+  return apiRequest<FunilEvolucaoMensal[]>(`/api/funil-vendas/evolucao-mensal${buildFunilVendasParams(filtros)}`)
+}
+
+
+export type PanoramaCrmVisao = 'calendario' | 'coorte'
+export type PanoramaCrmOrigem = 'leads' | 'base' | 'total'
+
+export type PanoramaCrmVendedor = {
+  id: number
+  nome: string
+}
+
+export type PanoramaCrmFiltros = {
+  dateIni: string
+  dateFim: string
+  visao: PanoramaCrmVisao
+  pipelineId?: number | null
+  origem?: PanoramaCrmOrigem
+  userId?: number
+}
+
+export type PanoramaLeadsSnapshot = number
+
+export type PanoramaDealsSnapshot = {
+  emAndamento: number
+  valorEmAndamento: number
+}
+
+export type PanoramaLeadsCriadosRow = {
+  periodo: string
+  criados: number
+  comMovimentacao: number
+}
+
+export type PanoramaLeadsFechadosRow = {
+  periodo: string
+  convertidos: number
+  perdidos: number
+  cicloMedio: number | null
+}
+
+export type PanoramaLeadRow = PanoramaLeadsCriadosRow & PanoramaLeadsFechadosRow & {
+  emAndamento?: number
+  taxaConv: number | null
+}
+
+export type PanoramaLeadsCalendarioResponse = {
+  criados: PanoramaLeadsCriadosRow[]
+  fechados: PanoramaLeadsFechadosRow[]
+}
+
+export type PanoramaLeadsCoorteResponse = {
+  rows: PanoramaLeadRow[]
+}
+
+export type PanoramaLeadsResponse = PanoramaLeadsCalendarioResponse | PanoramaLeadsCoorteResponse
+
+export type PanoramaDealsCriadosRow = {
+  periodo: string
+  criados: number
+}
+
+export type PanoramaDealsFechadosRow = {
+  periodo: string
+  ganhos: number
+  valorGanhos: number
+  perdidos: number
+  cicloTotal: number | null
+  cicloGanhos: number | null
+}
+
+export type PanoramaDealRow = PanoramaDealsCriadosRow & PanoramaDealsFechadosRow & {
+  emAndamento?: number
+  valorEmAndamento?: number
+  taxaConv: number | null
+}
+
+export type PanoramaDealsCalendarioResponse = {
+  criados: PanoramaDealsCriadosRow[]
+  fechados: PanoramaDealsFechadosRow[]
+}
+
+export type PanoramaDealsCoorteResponse = {
+  rows: PanoramaDealRow[]
+}
+
+export type PanoramaDealsResponse = PanoramaDealsCalendarioResponse | PanoramaDealsCoorteResponse
+
+function buildPanoramaCrmParams(filtros: Partial<PanoramaCrmFiltros> = {}) {
+  const params = new URLSearchParams()
+  if (filtros.dateIni) params.set('dateIni', filtros.dateIni)
+  if (filtros.dateFim) params.set('dateFim', filtros.dateFim)
+  if (filtros.visao) params.set('visao', filtros.visao)
+  if (filtros.pipelineId != null) params.set('pipelineId', String(filtros.pipelineId))
+  if (filtros.origem) params.set('origem', filtros.origem)
+  if (filtros.userId != null) params.set('userId', String(filtros.userId))
+  const query = params.toString()
+  return query ? `?${query}` : ''
+}
+
+export async function getPanoramaCrmVendedores(): Promise<PanoramaCrmVendedor[]> {
+  return apiRequest<PanoramaCrmVendedor[]>('/api/panorama-crm/vendedores')
+}
+
+export async function getPanoramaLeadsSnapshot(): Promise<PanoramaLeadsSnapshot> {
+  return apiRequest<PanoramaLeadsSnapshot>('/api/panorama-crm/leads-snapshot')
+}
+
+export async function getPanoramaDealsSnapshot(filtros: Pick<PanoramaCrmFiltros, 'pipelineId' | 'origem' | 'userId'>): Promise<PanoramaDealsSnapshot> {
+  return apiRequest<PanoramaDealsSnapshot>(`/api/panorama-crm/deals-snapshot${buildPanoramaCrmParams(filtros)}`)
+}
+
+export async function getPanoramaLeads(filtros: Pick<PanoramaCrmFiltros, 'dateIni' | 'dateFim' | 'visao'>): Promise<PanoramaLeadsResponse> {
+  return apiRequest<PanoramaLeadsResponse>(`/api/panorama-crm/leads${buildPanoramaCrmParams(filtros)}`)
+}
+
+export async function getPanoramaDeals(filtros: PanoramaCrmFiltros): Promise<PanoramaDealsResponse> {
+  return apiRequest<PanoramaDealsResponse>(`/api/panorama-crm/deals${buildPanoramaCrmParams(filtros)}`)
+}
