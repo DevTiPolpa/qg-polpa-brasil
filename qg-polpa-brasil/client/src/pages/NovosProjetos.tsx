@@ -1,11 +1,18 @@
 import { useState, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
   LineChart, Line, Legend,
 } from 'recharts'
-import { trpc } from '../lib/trpc'
 import FiltrosGlobais, { type Filtros } from '../components/FiltrosGlobais'
 import { formatCurrency, formatNumber, formatMes } from '../lib/utils'
+import {
+  getNovosProjetosDrilldown,
+  getNovosProjetosKpis,
+  getNovosProjetosLista,
+  getNovosProjetosPorMes,
+  type NovosProjetosItem,
+} from '../lib/api'
 import {
   FolderOpen, TrendingUp, RefreshCw, DollarSign, X, ChevronRight,
   ChevronDown, ArrowUpRight, Clock, Zap,
@@ -50,12 +57,7 @@ function origemBadge(origem: string) {
     : 'bg-slate-700/60 text-slate-400 border border-slate-600/40'
 }
 
-type ProjetoItem = {
-  codParc: number; razaoSocial: string; codProduto: string; nomeProduto: string
-  nomeVendedor: string; dtPrimeiro: string; mesAtualCiclo: number
-  ultimaCompra: string; volumeTotal: number; faturamentoTotal: number
-  status: string; origem: string
-}
+type ProjetoItem = NovosProjetosItem
 
 interface ClickableCardProps {
   icon: React.ReactNode
@@ -123,17 +125,31 @@ export default function NovosProjetos() {
   const [search, setSearch] = useState('')
 
   const baseInput = useMemo(() => ({ ...filtros, projetos: [] as string[] }), [filtros])
-  const modoInput = useMemo(() => ({ ...baseInput, modoCard: selectedCard ?? 'totais' as const }), [baseInput, selectedCard])
+  const modoInput = useMemo(() => ({ ...baseInput, modoCard: (selectedCard ?? 'totais') as 'abertos' | 'totais' }), [baseInput, selectedCard])
   // kpisInput só inclui modoCard quando um card está ativo; undefined aciona soma direta no backend
   const kpisInput = useMemo(() => selectedCard ? { ...baseInput, modoCard: selectedCard } : baseInput, [baseInput, selectedCard])
 
-  const { data: kpis } = trpc.novosProjetos.kpis.useQuery(kpisInput, queryOpts)
-  const { data: porMes } = trpc.novosProjetos.porMes.useQuery(modoInput, queryOpts)
-  const { data: lista } = trpc.novosProjetos.lista.useQuery(modoInput, queryOpts)
-  const { data: drilldown, isLoading: drilldownLoading } = trpc.novosProjetos.drilldown.useQuery(
-    { ...baseInput, mes: drilldownMes ?? '' },
-    { ...queryOpts, enabled: !!drilldownMes }
-  )
+  const { data: kpis } = useQuery({
+    queryKey: ['novos-projetos', 'kpis', kpisInput],
+    queryFn: () => getNovosProjetosKpis(kpisInput),
+    ...queryOpts,
+  })
+  const { data: porMes } = useQuery({
+    queryKey: ['novos-projetos', 'por-mes', modoInput],
+    queryFn: () => getNovosProjetosPorMes(modoInput),
+    ...queryOpts,
+  })
+  const { data: lista } = useQuery({
+    queryKey: ['novos-projetos', 'lista', modoInput],
+    queryFn: () => getNovosProjetosLista(modoInput),
+    ...queryOpts,
+  })
+  const { data: drilldown, isLoading: drilldownLoading } = useQuery({
+    queryKey: ['novos-projetos', 'drilldown', drilldownMes, baseInput],
+    queryFn: () => getNovosProjetosDrilldown(drilldownMes ?? '', baseInput),
+    enabled: !!drilldownMes,
+    ...queryOpts,
+  })
 
   const porMesChart = useMemo(() =>
     (porMes ?? []).map(r => ({
