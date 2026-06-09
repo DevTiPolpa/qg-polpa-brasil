@@ -1,6 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { trpc } from '../lib/trpc'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Send, Bot, User, Loader2, Plus, Trash2, MessageSquare, ChevronLeft } from 'lucide-react'
+import {
+  deleteChatSession,
+  getChatHistory,
+  getChatSessions,
+  sendChatMessage,
+  type ChatAgentHistoryMessage,
+} from '../lib/api'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -8,8 +15,10 @@ function newSessionId() {
   return `conv-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 }
 
-function formatDate(date: Date | string) {
+function formatDate(date: Date | string | null | undefined) {
+  if (!date) return 'agora'
   const d = new Date(date)
+  if (Number.isNaN(d.getTime())) return 'agora'
   const now = new Date()
   const diff = now.getTime() - d.getTime()
   if (diff < 60_000) return 'agora'
@@ -29,31 +38,39 @@ const EXAMPLES = [
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export default function Chat() {
+  const queryClient = useQueryClient()
   const [activeSession, setActiveSession] = useState<string | null>(null)
-  const [agentHistories, setAgentHistories] = useState<Record<string, unknown[]>>({})
+  const [agentHistories, setAgentHistories] = useState<Record<string, ChatAgentHistoryMessage[]>>({})
   const [input, setInput] = useState('')
   const [showSidebar, setShowSidebar] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const sessionsQuery = trpc.chatbot.sessions.useQuery()
-  const historyQuery = trpc.chatbot.history.useQuery(
-    { sessionId: activeSession! },
-    { enabled: !!activeSession }
-  )
+  const sessionsQuery = useQuery({
+    queryKey: ['chatbot', 'sessions'],
+    queryFn: getChatSessions,
+  })
 
-  const sendMutation = trpc.chatbot.send.useMutation({
-    onSuccess: (data) => {
-      setAgentHistories(prev => ({ ...prev, [activeSession!]: data.agentHistory }))
-      historyQuery.refetch()
-      sessionsQuery.refetch()
+  const historyQuery = useQuery({
+    queryKey: ['chatbot', 'history', activeSession],
+    queryFn: () => getChatHistory(activeSession!),
+    enabled: !!activeSession,
+  })
+
+  const sendMutation = useMutation({
+    mutationFn: sendChatMessage,
+    onSuccess: (data, variables) => {
+      setAgentHistories(prev => ({ ...prev, [variables.sessionId]: data.agentHistory ?? [] }))
+      queryClient.invalidateQueries({ queryKey: ['chatbot', 'history', variables.sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['chatbot', 'sessions'] })
     },
   })
 
-  const deleteMutation = trpc.chatbot.deleteSession.useMutation({
-    onSuccess: (_data, vars) => {
-      if (activeSession === vars.sessionId) setActiveSession(null)
-      setAgentHistories(prev => { const n = { ...prev }; delete n[vars.sessionId]; return n })
-      sessionsQuery.refetch()
+  const deleteMutation = useMutation({
+    mutationFn: deleteChatSession,
+    onSuccess: (_data, sessionId) => {
+      if (activeSession === sessionId) setActiveSession(null)
+      setAgentHistories(prev => { const n = { ...prev }; delete n[sessionId]; return n })
+      queryClient.invalidateQueries({ queryKey: ['chatbot', 'sessions'] })
     },
   })
 
@@ -92,7 +109,7 @@ export default function Chat() {
   }
 
   const messages = (historyQuery.data ?? []).map(m => ({
-    role: m.role as 'user' | 'assistant',
+    role: m.role,
     content: m.content,
   }))
 
@@ -134,7 +151,7 @@ export default function Chat() {
                 <p className="text-slate-500 text-xs mt-0.5">{formatDate(s.last_at)}</p>
               </div>
               <button
-                onClick={(e) => { e.stopPropagation(); deleteMutation.mutate({ sessionId: s.session_id }) }}
+                onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(s.session_id) }}
                 className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all shrink-0 mt-0.5"
               >
                 <Trash2 size={13} />
@@ -228,7 +245,7 @@ export default function Chat() {
 
         {sendMutation.isError && (
           <p className="text-center text-red-400 text-xs py-2">
-            Erro ao conectar com o agente. Verifique se o serviço Python está rodando.
+            Erro ao conectar com o agente. Verifique se a API Python está rodando e se VITE_API_BASE_URL aponta para ela.
           </p>
         )}
 

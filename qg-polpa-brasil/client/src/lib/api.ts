@@ -1113,3 +1113,68 @@ export async function getPanoramaLeads(filtros: Pick<PanoramaCrmFiltros, 'dateIn
 export async function getPanoramaDeals(filtros: PanoramaCrmFiltros): Promise<PanoramaDealsResponse> {
   return apiRequest<PanoramaDealsResponse>(`/api/panorama-crm/deals${buildPanoramaCrmParams(filtros)}`)
 }
+
+// =============================================================================
+// Agente IA / Chatbot — helpers REST
+// =============================================================================
+
+export type ChatRole = 'user' | 'assistant'
+
+export type ChatMessage = {
+  id?: number | null
+  session_id: string
+  role: ChatRole
+  content: string
+  created_at?: string | null
+}
+
+export type ChatAgentHistoryMessage = {
+  role: ChatRole
+  content: string
+}
+
+export type ChatSession = {
+  session_id: string
+  title: string | null
+  last_at: string
+  message_count?: number
+}
+
+export type ChatSendPayload = {
+  sessionId: string
+  message: string
+  history?: ChatAgentHistoryMessage[]
+}
+
+export type ChatSendResponse = {
+  reply: string
+  agentHistory: ChatAgentHistoryMessage[]
+}
+
+export async function getChatSessions(): Promise<ChatSession[]> {
+  return apiRequest<ChatSession[]>('/api/chatbot/sessions')
+}
+
+export async function getChatHistory(sessionId: string, limit = 50): Promise<ChatMessage[]> {
+  const params = new URLSearchParams()
+  if (limit) params.set('limit', String(limit))
+  const query = params.toString()
+  return apiRequest<ChatMessage[]>(`/api/chatbot/history/${encodeURIComponent(sessionId)}${query ? `?${query}` : ''}`)
+}
+
+export async function sendChatMessage(payload: ChatSendPayload): Promise<ChatSendResponse> {
+  return apiRequest<ChatSendResponse>('/api/chatbot/send', {
+    method: 'POST',
+    body: JSON.stringify({
+      sessionId: payload.sessionId,
+      message: payload.message,
+      history: payload.history ?? [],
+    }),
+  })
+}
+
+export async function deleteChatSession(sessionId: string): Promise<{ success: boolean }> {
+  return apiRequest<{ success: boolean }>(`/api/chatbot/sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'DELETE',
+  })
+}
