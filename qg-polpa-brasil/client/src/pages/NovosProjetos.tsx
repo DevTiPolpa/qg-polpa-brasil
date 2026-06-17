@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LabelList,
   LineChart, Line, Legend,
 } from 'recharts'
 import FiltrosGlobais, { type Filtros } from '../components/FiltrosGlobais'
@@ -11,6 +11,7 @@ import {
   getNovosProjetosKpis,
   getNovosProjetosLista,
   getNovosProjetosPorMes,
+  getNovosProjetosRecorrentesConvertidos,
   type NovosProjetosItem,
 } from '../lib/api'
 import {
@@ -19,6 +20,11 @@ import {
 } from 'lucide-react'
 
 const DEFAULT_FILTROS: Filtros = { dataInicio: '2026-01-01', dataFim: '2026-12-31' }
+
+const LINHAS_VISIVEIS = 25
+const ALTURA_LINHA_PX = 38
+const ALTURA_CABECALHO_PX = 38
+const ALTURA_TABELA_PX = ALTURA_CABECALHO_PX + LINHAS_VISIVEIS * ALTURA_LINHA_PX
 
 function formatCurrencyK(value: number) {
   if (Math.abs(value) >= 1_000_000) return `R$${(value / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}M`
@@ -65,19 +71,23 @@ interface ClickableCardProps {
   value: string
   sub: string
   active: boolean
-  color: 'blue' | 'green'
+  color: 'blue' | 'green' | 'amber'
   onClick: () => void
 }
 
 function ClickableCard({ icon, label, value, sub, active, color, onClick }: ClickableCardProps) {
   const ring = color === 'blue'
     ? active ? 'border-blue-500 bg-blue-900/20 shadow-blue-900/30 shadow-lg' : 'border-slate-700 hover:border-blue-600/50 hover:bg-blue-900/10'
-    : active ? 'border-green-500 bg-green-900/20 shadow-green-900/30 shadow-lg' : 'border-slate-700 hover:border-green-600/50 hover:bg-green-900/10'
+    : color === 'green'
+      ? active ? 'border-green-500 bg-green-900/20 shadow-green-900/30 shadow-lg' : 'border-slate-700 hover:border-green-600/50 hover:bg-green-900/10'
+      : active ? 'border-amber-500 bg-amber-900/20 shadow-amber-900/30 shadow-lg' : 'border-slate-700 hover:border-amber-600/50 hover:bg-amber-900/10'
   const iconRing = color === 'blue'
     ? active ? 'bg-blue-600/30' : 'bg-slate-700'
-    : active ? 'bg-green-600/30' : 'bg-slate-700'
+    : color === 'green'
+      ? active ? 'bg-green-600/30' : 'bg-slate-700'
+      : active ? 'bg-amber-600/30' : 'bg-slate-700'
   const valueColor = active
-    ? (color === 'blue' ? 'text-blue-300' : 'text-green-300')
+    ? (color === 'blue' ? 'text-blue-300' : color === 'green' ? 'text-green-300' : 'text-amber-300')
     : 'text-white'
 
   return (
@@ -96,7 +106,7 @@ function ClickableCard({ icon, label, value, sub, active, color, onClick }: Clic
         <p className={`text-xl font-bold leading-tight transition-colors ${valueColor}`}>{value}</p>
         <p className="text-xs text-slate-500">{sub}</p>
       </div>
-      <ArrowUpRight className={`w-3.5 h-3.5 shrink-0 transition-colors ${active ? (color === 'blue' ? 'text-blue-400' : 'text-green-400') : 'text-slate-600'}`} />
+      <ArrowUpRight className={`w-3.5 h-3.5 shrink-0 transition-colors ${active ? (color === 'blue' ? 'text-blue-400' : color === 'green' ? 'text-green-400' : 'text-amber-400') : 'text-slate-600'}`} />
     </button>
   )
 }
@@ -120,9 +130,10 @@ const queryOpts = { staleTime: 2 * 60 * 1000 }
 
 export default function NovosProjetos() {
   const [filtros, setFiltros] = useState<Filtros>(DEFAULT_FILTROS)
-  const [selectedCard, setSelectedCard] = useState<'abertos' | 'totais' | null>(null)
+  const [selectedCard, setSelectedCard] = useState<'abertos' | null>(null)
   const [drilldownMes, setDrilldownMes] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [showRecorrentesPanel, setShowRecorrentesPanel] = useState(false)
 
   const baseInput = useMemo(() => ({ ...filtros, projetos: [] as string[] }), [filtros])
   const modoInput = useMemo(() => ({ ...baseInput, modoCard: (selectedCard ?? 'totais') as 'abertos' | 'totais' }), [baseInput, selectedCard])
@@ -150,6 +161,12 @@ export default function NovosProjetos() {
     enabled: !!drilldownMes,
     ...queryOpts,
   })
+  const { data: recorrentesConvertidos } = useQuery({
+    queryKey: ['novos-projetos', 'recorrentes-convertidos', baseInput],
+    queryFn: () => getNovosProjetosRecorrentesConvertidos(baseInput),
+    enabled: showRecorrentesPanel,
+    ...queryOpts,
+  })
 
   const porMesChart = useMemo(() =>
     (porMes ?? []).map(r => ({
@@ -171,7 +188,7 @@ export default function NovosProjetos() {
     [lista, search]
   )
 
-  function toggleCard(card: 'abertos' | 'totais') {
+  function toggleCard(card: 'abertos') {
     setSelectedCard(c => c === card ? null : card)
     setDrilldownMes(null)
   }
@@ -190,14 +207,10 @@ export default function NovosProjetos() {
 
       {/* Active filter banner */}
       {activeBanner && (
-        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs border ${
-          selectedCard === 'abertos'
-            ? 'bg-blue-900/30 border-blue-700/50 text-blue-300'
-            : 'bg-green-900/30 border-green-700/50 text-green-300'
-        }`}>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs border bg-blue-900/30 border-blue-700/50 text-blue-300">
           <Zap className="w-3.5 h-3.5 shrink-0" />
           <span>
-            Filtrando por: <strong>{selectedCard === 'abertos' ? 'Projetos Abertos no Período' : 'Projetos Totais (M1–M12)'}</strong>
+            Filtrando por: <strong>Projetos Abertos no Período</strong>
           </span>
           <button onClick={() => setSelectedCard(null)} className="ml-auto hover:opacity-70 transition-opacity">
             <X className="w-3.5 h-3.5" />
@@ -216,14 +229,11 @@ export default function NovosProjetos() {
           color="blue"
           onClick={() => toggleCard('abertos')}
         />
-        <ClickableCard
+        <InfoCard
           icon={<DollarSign className="w-4 h-4 text-green-400" />}
           label="Projetos Totais"
           value={formatNumber(kpis?.projetosTotais ?? 0)}
           sub="M1–M12 ativos no período"
-          active={selectedCard === 'totais'}
-          color="green"
-          onClick={() => toggleCard('totais')}
         />
         <InfoCard
           icon={<TrendingUp className="w-4 h-4 text-emerald-400" />}
@@ -231,11 +241,14 @@ export default function NovosProjetos() {
           value={formatCurrency(kpis?.faturamentoTotal ?? 0)}
           sub="novos projetos no período"
         />
-        <InfoCard
+        <ClickableCard
           icon={<RefreshCw className="w-4 h-4 text-amber-400" />}
           label="Taxa de Conversão para Recorrentes"
           value={`${(kpis?.taxaConversao ?? 0).toFixed(1)}%`}
           sub={`${kpis?.taxaConversaoConvertidos ?? 0} de ${kpis?.taxaConversaoTotal ?? 0} atingiram M13`}
+          active={showRecorrentesPanel}
+          color="amber"
+          onClick={() => setShowRecorrentesPanel(v => !v)}
         />
         <InfoCard
           icon={<TrendingUp className="w-4 h-4 text-purple-400" />}
@@ -260,16 +273,15 @@ export default function NovosProjetos() {
               </button>
             )}
           </div>
-          <p className="text-xs text-slate-500 mb-3">
-            Clique em uma barra para ver o detalhamento do mês
-          </p>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={porMesChart} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} onClick={handleBarClick} style={{ cursor: 'pointer' }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+            <BarChart data={porMesChart} margin={{ top: 20, right: 8, left: 0, bottom: 0 }} onClick={handleBarClick} style={{ cursor: 'pointer' }}>
               <XAxis dataKey="mesLabel" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-              <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} allowDecimals={false} />
+              <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} allowDecimals={false} domain={[0, (max: number) => Math.ceil(max * 1.15)]} />
               <Tooltip
+                cursor={{ fill: 'rgba(148, 163, 184, 0.08)' }}
                 contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
+                itemStyle={{ color: '#ffffff' }}
+                labelStyle={{ color: '#ffffff' }}
                 formatter={(v: number, name: string) => [
                   name === 'Projetos' ? formatNumber(v) : formatCurrency(v),
                   name,
@@ -277,10 +289,18 @@ export default function NovosProjetos() {
                 labelFormatter={(l) => `Mês: ${l}`}
               />
               <Bar dataKey="projetos" name="Projetos" radius={[4, 4, 0, 0]}>
+                <LabelList
+                  dataKey="projetos"
+                  position="top"
+                  fill="#ffffff"
+                  style={{ fill: '#ffffff' }}
+                  fontSize={11}
+                  fontWeight={600}
+                />
                 {porMesChart.map((d, i) => (
                   <Cell
                     key={i}
-                    fill={drilldownMes === d.mes ? '#8b5cf6' : '#3b82f6'}
+                    fill={drilldownMes === d.mes ? '#8b5cf6' : '#5b82ab'}
                     opacity={drilldownMes && drilldownMes !== d.mes ? 0.4 : 1}
                   />
                 ))}
@@ -377,6 +397,62 @@ export default function NovosProjetos() {
         </div>
       )}
 
+      {/* Recorrentes drilldown panel */}
+      {showRecorrentesPanel && (
+        <div className="bg-slate-800 border border-amber-700/50 rounded-xl">
+          <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-amber-400" />
+              <h3 className="text-sm font-semibold text-white">Projetos que se tornaram Recorrentes (M13+)</h3>
+              {recorrentesConvertidos && (
+                <span className="text-xs text-slate-500">({recorrentesConvertidos.length})</span>
+              )}
+            </div>
+            <button onClick={() => setShowRecorrentesPanel(false)} className="text-slate-500 hover:text-white transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          {!recorrentesConvertidos ? (
+            <div className="p-8 text-center text-slate-500 text-sm">Carregando...</div>
+          ) : recorrentesConvertidos.length === 0 ? (
+            <div className="p-8 text-center text-slate-500 text-sm">Nenhum projeto converteu para recorrente no período.</div>
+          ) : (
+            <div className="overflow-auto" style={{ maxHeight: ALTURA_TABELA_PX }}>
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-slate-800">
+                  <tr className="border-b border-slate-700">
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-slate-400 uppercase">Cód. Cliente</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-slate-400 uppercase">Nome Cliente</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-slate-400 uppercase">Cód. Produto</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-slate-400 uppercase">Nome Produto</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-slate-400 uppercase">1ª Compra</th>
+                    <th className="text-right px-3 py-2 text-xs font-semibold text-slate-400 uppercase">Faturamento Total</th>
+                    <th className="text-center px-3 py-2 text-xs font-semibold text-slate-400 uppercase">Ciclo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recorrentesConvertidos.map(p => (
+                    <tr key={`${p.codParc}-${p.codProduto}`} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors">
+                      <td className="px-3 py-2 text-slate-500 text-xs font-mono">{p.codParc}</td>
+                      <td className="px-3 py-2 text-white text-xs font-medium max-w-[180px] truncate">{p.razaoSocial}</td>
+                      <td className="px-3 py-2 text-slate-500 text-xs font-mono">{p.codProduto}</td>
+                      <td className="px-3 py-2 text-slate-300 text-xs max-w-[180px] truncate">{p.nomeProduto}</td>
+                      <td className="px-3 py-2 text-slate-400 text-xs">{p.dtPrimeiro ? formatMes(p.dtPrimeiro) : '—'}</td>
+                      <td className="px-3 py-2 text-right text-white text-xs font-medium">{formatCurrency(Number(p.faturamentoTotal))}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${cycleColor(p.mesAtualCiclo)}`}>
+                          {labelMesCiclo(p.mesAtualCiclo)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Project list */}
       <div className="bg-slate-800 border border-slate-700 rounded-xl">
         <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between gap-3 flex-wrap">
@@ -393,9 +469,9 @@ export default function NovosProjetos() {
             className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 w-64"
           />
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-auto" style={{ maxHeight: ALTURA_TABELA_PX }}>
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-slate-800">
               <tr className="border-b border-slate-700">
                 <th className="text-left px-3 py-2.5 text-xs font-semibold text-slate-400 uppercase">Cód. Cliente</th>
                 <th className="text-left px-3 py-2.5 text-xs font-semibold text-slate-400 uppercase">Nome Cliente</th>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useLocation } from 'wouter'
 import {
-  LayoutDashboard, Users, ShoppingBag, Package, UserCog, LogOut,
+  LayoutDashboard, Users, UserCog, LogOut,
   ChevronLeft, ChevronRight, FolderOpen, TrendingUp, BarChart2, Target, Menu, X, MessageSquare, History,
 } from 'lucide-react'
 import { logout } from '../lib/api'
@@ -19,19 +19,19 @@ const menuGroups = [
       { icon: Users,       label: 'Histórico Clientes', path: '/historico-clientes' },
       { icon: History,     label: 'Comparativo Semanal', path: '/snapshot' },
       { icon: BarChart2,   label: 'Recorrentes R x O', path: '/recorrentes' },
-      { icon: ShoppingBag, label: 'Por Cliente',        path: '/clientes' },
-      { icon: Package,     label: 'Por Produto',        path: '/produtos' },
-    ],
-  },
-  {
-    group: 'CRM',
-    items: [
-      { icon: TrendingUp,    label: 'Funil de Vendas', path: '/funil-vendas' },
-      { icon: BarChart2,     label: 'Panorama CRM',    path: '/panorama-crm' },
-      { icon: MessageSquare, label: 'Agente IA',        path: '/chat' },
     ],
   },
 ]
+
+const crmMenuGroup = {
+  group: 'CRM',
+  items: [
+    { icon: TrendingUp,    label: 'Funil de Vendas', path: '/funil-vendas' },
+    { icon: BarChart2,     label: 'Panorama CRM',    path: '/panorama-crm' },
+  ],
+}
+
+const agenteIaItem = { icon: MessageSquare, label: 'Agente IA', path: '/chat' }
 
 const adminMenuGroup = {
   group: 'Administração',
@@ -62,7 +62,9 @@ export default function DashboardLayout({ children, user }: Props) {
     }
   }
 
-  const allGroups = user.role === 'ADMIN' ? [...menuGroups, adminMenuGroup] : menuGroups
+  const allGroups = user.role === 'ADMIN'
+    ? [...menuGroups, { ...crmMenuGroup, items: [...crmMenuGroup.items, agenteIaItem] }, adminMenuGroup]
+    : [...menuGroups, crmMenuGroup]
   const initials = (user.name ?? user.email).split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
 
   const sidebarContent = (

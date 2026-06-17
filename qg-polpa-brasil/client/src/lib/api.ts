@@ -199,6 +199,7 @@ export type VendedoresOriginalFiltros = {
   uf?: string
   codParc?: number
   codProduto?: number
+  codParcs?: number[]
   limitClientes?: number
 }
 
@@ -304,6 +305,12 @@ export type VendedoresOriginalCrmKpis = {
   cicloGanhos: number
 }
 
+export type VendedoresOriginalClienteProdutoMensal = {
+  mes: string
+  quantidade: number
+  valor: number
+}
+
 export type VendedoresOriginalResumo = {
   kpis: VendedoresOriginalKpis
   evolucaoMensal: VendedoresOriginalEvolucao[]
@@ -323,6 +330,12 @@ function appendArrayParam(params: URLSearchParams, key: string, values?: string[
   }
 }
 
+function appendIntArrayParam(params: URLSearchParams, key: string, values?: number[]) {
+  for (const value of values ?? []) {
+    if (value != null) params.append(key, String(value))
+  }
+}
+
 export async function getVendedoresOriginalResumo(filtros: VendedoresOriginalFiltros = {}): Promise<VendedoresOriginalResumo> {
   const params = new URLSearchParams()
   params.set('dataInicio', filtros.dataInicio || '2026-01-01')
@@ -336,6 +349,7 @@ export async function getVendedoresOriginalResumo(filtros: VendedoresOriginalFil
   if (filtros.uf) params.set('uf', filtros.uf)
   if (filtros.codParc != null) params.set('codParc', String(filtros.codParc))
   if (filtros.codProduto != null) params.set('codProduto', String(filtros.codProduto))
+  appendIntArrayParam(params, 'codParcs', filtros.codParcs)
   return apiRequest<VendedoresOriginalResumo>(`/api/vendedores-original/resumo?${params.toString()}`)
 }
 
@@ -351,6 +365,19 @@ export async function getVendedoresOriginalClienteMix(codParc: number, filtros: 
   if (filtros.uf) params.set('uf', filtros.uf)
   if (filtros.codProduto != null) params.set('codProduto', String(filtros.codProduto))
   return apiRequest<VendedoresOriginalClienteMix[]>(`/api/vendedores-original/clientes/${codParc}/mix?${params.toString()}`)
+}
+
+export async function getVendedoresOriginalClienteProdutoMensal(codParc: number, codProduto: number, filtros: VendedoresOriginalFiltros = {}): Promise<VendedoresOriginalClienteProdutoMensal[]> {
+  const params = new URLSearchParams()
+  params.set('dataInicio', filtros.dataInicio || '2026-01-01')
+  params.set('dataFim', filtros.dataFim || '2026-12-31')
+  appendArrayParam(params, 'mercados', filtros.mercados)
+  appendArrayParam(params, 'vendedores', filtros.vendedores)
+  appendArrayParam(params, 'projetos', filtros.projetos)
+  appendArrayParam(params, 'gruposProduto', filtros.gruposProduto)
+  appendArrayParam(params, 'tiposReceita', filtros.tiposReceita)
+  if (filtros.uf) params.set('uf', filtros.uf)
+  return apiRequest<VendedoresOriginalClienteProdutoMensal[]>(`/api/vendedores-original/clientes/${codParc}/produtos/${codProduto}/mensal?${params.toString()}`)
 }
 
 
@@ -371,6 +398,7 @@ export type DashboardOriginalFiltros = {
   uf?: string
   codParc?: number
   codProduto?: number
+  codParcs?: number[]
 }
 
 export type DashboardOriginalKpis = {
@@ -500,6 +528,7 @@ function appendDashboardFiltros(params: URLSearchParams, filtros: DashboardOrigi
   if (filtros.uf) params.set('uf', filtros.uf)
   if (filtros.codParc != null) params.set('codParc', String(filtros.codParc))
   if (filtros.codProduto != null) params.set('codProduto', String(filtros.codProduto))
+  appendIntArrayParam(params, 'codParcs', filtros.codParcs)
 }
 
 export async function getDashboardOriginalResumo(filtros: DashboardOriginalFiltros = {}, limitClientes?: number): Promise<DashboardOriginalResumo> {
@@ -542,6 +571,7 @@ export type NovosProjetosFiltros = {
   uf?: string | null
   codParc?: number | null
   codProduto?: number | null
+  codParcs?: number[]
   modoCard?: 'abertos' | 'totais' | null
 }
 
@@ -597,6 +627,7 @@ function buildNovosProjetosParams(filtros: NovosProjetosFiltros = {}, extra?: Re
   appendNovosProjetosArrayParam(params, 'projetos', filtros.projetos)
   appendNovosProjetosArrayParam(params, 'gruposProduto', filtros.gruposProduto)
   appendNovosProjetosArrayParam(params, 'tiposReceita', filtros.tiposReceita)
+  appendIntArrayParam(params, 'codParcs', filtros.codParcs)
 
   for (const [key, value] of Object.entries(extra ?? {})) {
     if (value !== null && value !== undefined && value !== '') params.set(key, String(value))
@@ -622,6 +653,22 @@ export async function getNovosProjetosDrilldown(mes: string, filtros: NovosProje
   return apiRequest<NovosProjetosItem[]>(`/api/novos-projetos/drilldown${buildNovosProjetosParams(filtros, { mes })}`)
 }
 
+export type NovosProjetosRecorrenteConvertido = {
+  codParc: number
+  razaoSocial: string
+  codProduto: string
+  nomeProduto: string
+  dtPrimeiro: string
+  mesAtualCiclo: number
+  ultimaCompra: string
+  volumeTotal: number
+  faturamentoTotal: number
+}
+
+export async function getNovosProjetosRecorrentesConvertidos(filtros: NovosProjetosFiltros = {}): Promise<NovosProjetosRecorrenteConvertido[]> {
+  return apiRequest<NovosProjetosRecorrenteConvertido[]>(`/api/novos-projetos/recorrentes-convertidos${buildNovosProjetosParams(filtros)}`)
+}
+
 // ============================================================
 // Histórico Clientes / Produtos (/historico-clientes) - API REST
 // ============================================================
@@ -635,6 +682,8 @@ export type HistoricoClientesFiltros = {
   vendedores?: string[]
   ufs?: string[]
   codProdutos?: string[]
+  dataInicio?: string
+  dataFim?: string
 }
 
 export type HistoricoClientesFiltrosDisponiveis = {
@@ -714,6 +763,8 @@ function buildHistoricoClientesParams(filtros: HistoricoClientesFiltros = {}) {
   appendHistoricoClientesArrayParam(params, 'vendedores', filtros.vendedores)
   appendHistoricoClientesArrayParam(params, 'ufs', filtros.ufs)
   appendHistoricoClientesArrayParam(params, 'codProdutos', filtros.codProdutos)
+  if (filtros.dataInicio) params.set('dataInicio', filtros.dataInicio)
+  if (filtros.dataFim) params.set('dataFim', filtros.dataFim)
   const query = params.toString()
   return query ? `?${query}` : ''
 }
@@ -762,6 +813,7 @@ export type SnapshotFiltros = {
   tiposReceita?: string[]
   uf?: string | null
   codParc?: number | null
+  codParcs?: number[]
 }
 
 export type SnapshotInfo = {
@@ -813,6 +865,7 @@ function buildSnapshotParams(filtros: SnapshotFiltros = {}) {
   appendArrayParam(params, 'projetos', filtros.projetos)
   appendArrayParam(params, 'gruposProduto', filtros.gruposProduto)
   appendArrayParam(params, 'tiposReceita', filtros.tiposReceita)
+  appendIntArrayParam(params, 'codParcs', filtros.codParcs)
   const query = params.toString()
   return query ? `?${query}` : ''
 }
@@ -844,6 +897,8 @@ export type RecorrentesFiltros = {
   mercados?: string[]
   vendedores?: string[]
   codParc?: number | null
+  codParcs?: number[]
+  gruposProduto?: string[]
 }
 
 export type RecorrentesFiltrosDisponiveis = {
@@ -883,6 +938,8 @@ function buildRecorrentesParams(filtros: RecorrentesFiltros = {}) {
   appendArrayParam(params, 'mercados', filtros.mercados)
   appendArrayParam(params, 'vendedores', filtros.vendedores)
   if (filtros.codParc != null) params.set('codParc', String(filtros.codParc))
+  appendIntArrayParam(params, 'codParcs', filtros.codParcs)
+  appendArrayParam(params, 'gruposProduto', filtros.gruposProduto)
   const query = params.toString()
   return query ? `?${query}` : ''
 }

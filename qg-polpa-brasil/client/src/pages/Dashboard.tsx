@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react";
-import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getDashboardOriginalClienteMix, getDashboardOriginalDrilldown, getDashboardOriginalResumo, type DashboardOriginalFiltros } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -144,7 +143,6 @@ function DrillDownModal({
 }: {
   open: boolean; onClose: () => void; tipoReceita: string | null; filtros: Filtros;
 }) {
-  const [, navigate] = useLocation();
   const [busca, setBusca] = useState("");
   const [expandido, setExpandido] = useState<number | null>(null);
 
@@ -241,10 +239,7 @@ function DrillDownModal({
                         {expandido === i ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                       </TableCell>
                       <TableCell className="text-xs font-medium text-foreground">
-                        <span
-                          className="hover:underline cursor-pointer"
-                          onClick={(e) => { e.stopPropagation(); onClose(); navigate(`/clientes?codParc=${cli.codParc}`); }}
-                        >{cli.razaoSocial}</span>
+                        {cli.razaoSocial}
                       </TableCell>
                       <TableCell className="text-xs font-semibold text-foreground text-right whitespace-nowrap">
                         {formatCurrency(cli.totalFat)}
@@ -419,11 +414,10 @@ const CLI_COLORS = [
 ];
 
 // Linha de cliente com expand/collapse de produtos
-function ClienteTopRow({ cli, i, totalFat, onNavigate, filtrosCombinados }: {
+function ClienteTopRow({ cli, i, totalFat, filtrosCombinados }: {
   cli: { razaoSocial: string; faturamento: number; volume: number; produtos: number; codParc?: number };
   i: number;
   totalFat: number;
-  onNavigate?: (codParc: number) => void;
   filtrosCombinados?: Record<string, any>;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -452,9 +446,8 @@ function ClienteTopRow({ cli, i, totalFat, onNavigate, filtrosCombinados }: {
             </button>
             <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
             <span
-              className="font-medium text-foreground truncate max-w-[320px] cursor-pointer hover:underline"
+              className="font-medium text-foreground truncate max-w-[320px]"
               title={label}
-              onClick={() => onNavigate && cli.codParc ? onNavigate(cli.codParc) : undefined}
             >{label}</span>
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -489,9 +482,8 @@ function ClienteTopRow({ cli, i, totalFat, onNavigate, filtrosCombinados }: {
   );
 }
 
-function ClientesTopBlock({ data, onNavigate, filtroLabel, filtrosCombinados }: {
+function ClientesTopBlock({ data, filtroLabel, filtrosCombinados }: {
   data: { razaoSocial: string; faturamento: number; volume: number; produtos: number; codParc?: number }[];
-  onNavigate?: (codParc: number) => void;
   filtroLabel?: string;
   filtrosCombinados?: Record<string, any>;
 }) {
@@ -502,7 +494,7 @@ function ClientesTopBlock({ data, onNavigate, filtroLabel, filtrosCombinados }: 
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="text-sm font-semibold text-foreground">
             Top Clientes por Faturamento
-            {onNavigate && <span className="text-[10px] text-muted-foreground font-normal ml-2">· clique no nome para ver detalhes · seta para expandir produtos</span>}
+            <span className="text-[10px] text-muted-foreground font-normal ml-2">· seta para expandir produtos</span>
           </CardTitle>
           {filtroLabel && (
             <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border border-[oklch(0.65_0.20_145_/_0.4)] bg-[oklch(0.65_0.20_145_/_0.08)] text-[oklch(0.75_0.15_145)]">
@@ -520,7 +512,6 @@ function ClientesTopBlock({ data, onNavigate, filtroLabel, filtrosCombinados }: 
               cli={cli}
               i={i}
               totalFat={totalFat}
-              onNavigate={onNavigate}
               filtrosCombinados={filtrosCombinados}
             />
           ))}
@@ -532,7 +523,6 @@ function ClientesTopBlock({ data, onNavigate, filtroLabel, filtrosCombinados }: 
 
 // ─── Dashboard Principal ─────────────────────────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const [, navigate] = useLocation();
   const [filtros, setFiltros] = useState<Filtros>({ dataInicio: "2026-01-01", dataFim: "2026-12-31" });
   const [drillDownTipo, setDrillDownTipo] = useState<string | null>(null);
   const [tipoReceitaFiltro, setTipoReceitaFiltro] = useState<string | null>(null);
@@ -715,7 +705,7 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* KPI Cards — clique em Clientes navega para /clientes, Produtos para /produtos */}
+      {/* KPI Cards */}
       <div className={`grid gap-3 ${temDevolucao ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-6" : "grid-cols-2 md:grid-cols-3 lg:grid-cols-5"}`}>
         {KPI_CONFIG.map((cfg) => (
           <KpiCard
@@ -728,11 +718,6 @@ export default function Dashboard() {
             loading={loadingKpis}
             atual={(kpis as any)?.[cfg.key] ?? undefined}
             anterior={(kpisAnt as any)?.[cfg.key] ?? null}
-            onClick={
-              cfg.key === "clientesAtivos" ? () => navigate("/clientes") :
-              cfg.key === "produtosVendidos" ? () => navigate("/produtos") :
-              undefined
-            }
           />
         ))}
         {/* Card de Devoluções integrado na grid */}
@@ -1076,7 +1061,6 @@ export default function Dashboard() {
                 produtos: Number(c.produtos),
                 codParc: c.codParc ?? undefined,
               }))}
-              onNavigate={(codParc) => navigate(`/clientes?codParc=${codParc}`)}
               filtroLabel={[
                 ...(filtros.projetos ?? (filtros.projeto ? [filtros.projeto] : [])),
                 ...(filtros.mercados ?? (filtros.mercado ? [filtros.mercado] : [])),

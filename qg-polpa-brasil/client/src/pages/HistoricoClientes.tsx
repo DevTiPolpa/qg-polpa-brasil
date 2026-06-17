@@ -1,11 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts'
 import { useQuery } from '@tanstack/react-query'
+import FiltrosGlobais, { type Filtros } from '../components/FiltrosGlobais'
 import {
-  getHistoricoClientesFiltros,
   getHistoricoClientesKpis,
   getHistoricoClientesLista,
   getHistoricoClientesEvolucaoMensal,
@@ -20,14 +20,7 @@ import {
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface FiltrosH {
-  anos: number[]
-  meses: number[]
-  codParcs: number[]
-  mercados: string[]
-  gruposProduto: string[]
-  vendedores: string[]
-}
+const DEFAULT_FILTROS: Filtros = { dataInicio: '2026-01-01', dataFim: '2026-12-31' }
 
 type CrossFilter = { type: 'uf' | 'segmento'; value: string } | null
 
@@ -55,77 +48,6 @@ function fmtKg(v: number) {
 
 function fmtTableNum(v: number) {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-// ─── Filter Input ─────────────────────────────────────────────────────────────
-type OptionItem = string | { value: string; label: string }
-
-interface MultiSelectProps {
-  label: string
-  selected: string[]
-  options: OptionItem[]
-  onChange: (v: string[]) => void
-  minWidth?: string
-  searchable?: boolean
-}
-function MultiSelectField({ label, selected, options, onChange, minWidth = '130px', searchable }: MultiSelectProps) {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const norm = (options as OptionItem[]).map(o =>
-    typeof o === 'string' ? { value: o, label: o } : o
-  )
-  const displayed = searchable && search.trim()
-    ? norm.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
-    : norm
-  const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v])
-  const displayLabel = selected.length === 0 ? 'Todos'
-    : selected.length === 1 ? (norm.find(o => o.value === selected[0])?.label ?? selected[0])
-    : `${selected.length} selecionados`
-
-  function handleClose() { setOpen(false); setSearch('') }
-
-  return (
-    <div className="flex flex-col gap-0.5 relative" style={{ minWidth }}>
-      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1">{label}</label>
-      <button
-        onClick={() => open ? handleClose() : setOpen(true)}
-        className="bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-green-500 flex items-center gap-1 justify-between"
-      >
-        <span className="truncate text-left">{displayLabel}</span>
-        {selected.length > 0
-          ? <X className="w-3 h-3 shrink-0 text-slate-400" onClick={e => { e.stopPropagation(); onChange([]) }} />
-          : <ChevronDown className="w-3 h-3 shrink-0 text-slate-400" />
-        }
-      </button>
-      {open && (
-        <div className="absolute top-full left-0 z-50 mt-1 w-56 bg-slate-800 border border-slate-600 rounded-lg shadow-xl overflow-hidden">
-          {searchable && (
-            <div className="px-2 pt-2 pb-1">
-              <input
-                autoFocus
-                type="text"
-                placeholder="Pesquisar..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-              />
-            </div>
-          )}
-          <div className="overflow-y-auto max-h-52">
-            {displayed.length === 0 && (
-              <p className="px-3 py-2 text-xs text-slate-500 italic">Nenhum resultado</p>
-            )}
-            {displayed.map(o => (
-              <label key={o.value} className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-700 cursor-pointer text-sm text-slate-300">
-                <input type="checkbox" checked={selected.includes(o.value)} onChange={() => toggle(o.value)} className="accent-green-500" />
-                <span className="truncate">{o.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
 }
 
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
@@ -250,20 +172,13 @@ type ClienteItem = {
   qtdProdutos: number; pctValor: number; pctVolume: number
 }
 
-function ClienteRow({ c, rank, applied, isExpanded, onToggle, dimmed, selectedProductCode, onProductClick }: {
-  c: ClienteItem; rank: number; applied: FiltrosH
+function ClienteRow({ c, rank, baseFiltros, isExpanded, onToggle, dimmed, selectedProductCode, onProductClick }: {
+  c: ClienteItem; rank: number; baseFiltros: HistoricoClientesFiltros
   isExpanded: boolean; onToggle: () => void; dimmed?: boolean
   selectedProductCode?: string | null
   onProductClick?: (code: string, name: string) => void
 }) {
-  const produtosFiltros = useMemo<HistoricoClientesFiltros>(() => ({
-    anos: applied.anos,
-    meses: applied.meses.length ? applied.meses : undefined,
-    codParcs: applied.codParcs.length ? applied.codParcs : undefined,
-    mercados: applied.mercados.length ? applied.mercados : undefined,
-    gruposProduto: applied.gruposProduto.length ? applied.gruposProduto : undefined,
-    vendedores: applied.vendedores.length ? applied.vendedores : undefined,
-  }), [applied])
+  const produtosFiltros = baseFiltros
 
   const { data: produtos, isLoading: prodLoading } = useQuery({
     queryKey: ['historico-clientes', 'cliente-produtos', c.codParc, produtosFiltros],
@@ -366,14 +281,14 @@ function ClienteRow({ c, rank, applied, isExpanded, onToggle, dimmed, selectedPr
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-function toBackend(f: FiltrosH): HistoricoClientesFiltros {
+function toBackend(f: Filtros): HistoricoClientesFiltros {
   return {
-    anos: f.anos,
-    meses: f.meses.length ? f.meses : undefined,
-    codParcs: f.codParcs.length ? f.codParcs : undefined,
-    mercados: f.mercados.length ? f.mercados : undefined,
-    gruposProduto: f.gruposProduto.length ? f.gruposProduto : undefined,
-    vendedores: f.vendedores.length ? f.vendedores : undefined,
+    dataInicio: f.dataInicio,
+    dataFim: f.dataFim,
+    codParcs: f.codParcs?.length ? f.codParcs : undefined,
+    mercados: f.mercados?.length ? f.mercados : undefined,
+    gruposProduto: f.gruposProduto?.length ? f.gruposProduto : undefined,
+    vendedores: f.vendedores?.length ? f.vendedores : undefined,
   }
 }
 
@@ -384,12 +299,7 @@ function withMonth(b: HistoricoClientesFiltros, mes: number | null): HistoricoCl
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function HistoricoClientes() {
-  const currentYear = new Date().getFullYear()
-
-  const [pending, setPending] = useState<FiltrosH>({
-    anos: [currentYear], meses: [], codParcs: [], mercados: [], gruposProduto: [], vendedores: [],
-  })
-  const [applied, setApplied] = useState<FiltrosH>({ ...pending })
+  const [filtros, setFiltros] = useState<Filtros>(DEFAULT_FILTROS)
   const [updatedAt, setUpdatedAt] = useState(() => new Date())
 
   // cross-filter: donut slice selection (filtra tabela de clientes)
@@ -401,17 +311,14 @@ export default function HistoricoClientes() {
   // product cross-filter: clicar em produto na expansão do cliente filtra todos os painéis
   const [productCrossFilter, setProductCrossFilter] = useState<{ code: string; name: string } | null>(null)
 
-  const { data: filtrosData } = useQuery({
-    queryKey: ['historico-clientes', 'filtros'],
-    queryFn: getHistoricoClientesFiltros,
-    staleTime: 60_000,
-  })
-
-  const anosOpts = useMemo(() => {
-    const av = filtrosData?.anos ?? []
-    if (!av.includes(currentYear)) return [currentYear, ...av]
-    return av
-  }, [filtrosData, currentYear])
+  // Sempre que os filtros globais mudarem, reseta os cross-filters e marca a atualização
+  useEffect(() => {
+    setCrossFilter(null)
+    setExpandedParc(null)
+    setMonthCrossFilter(null)
+    setProductCrossFilter(null)
+    setUpdatedAt(new Date())
+  }, [filtros])
 
   const queryOpts = { staleTime: 30_000 }
 
@@ -419,31 +326,31 @@ export default function HistoricoClientes() {
 
   // Queries para donuts: produto > cliente expandido > base
   const donutBackend = useMemo(() => {
-    const base = toBackend(applied)
+    const base = toBackend(filtros)
     if (productCode) return { ...base, codProdutos: [productCode] }
     if (expandedParc) return { ...base, codParcs: [expandedParc] }
     return base
-  }, [applied, expandedParc, productCode])
+  }, [filtros, expandedParc, productCode])
 
   // Query para clientes: produto > cross-filter donut > base
   const clientesBackend = useMemo(() => {
-    const base = toBackend(applied)
+    const base = toBackend(filtros)
     if (productCode) return { ...base, codProdutos: [productCode] }
     if (crossFilter?.type === 'uf') return { ...base, ufs: [crossFilter.value] }
     if (crossFilter?.type === 'segmento') return { ...base, gruposProduto: [...(base.gruposProduto ?? []), crossFilter.value] }
     return base
-  }, [applied, crossFilter, productCode])
+  }, [filtros, crossFilter, productCode])
 
   // Backends para kpis e evolução que também filtram por produto
   const kpisBackend = useMemo(() => {
-    const base = toBackend(applied)
+    const base = toBackend(filtros)
     return productCode ? { ...base, codProdutos: [productCode] } : base
-  }, [applied, productCode])
+  }, [filtros, productCode])
 
   const evolucaoBackend = useMemo(() => {
-    const base = toBackend(applied)
+    const base = toBackend(filtros)
     return productCode ? { ...base, codProdutos: [productCode] } : base
-  }, [applied, productCode])
+  }, [filtros, productCode])
 
   const kpisQueryInput = useMemo(() => withMonth(kpisBackend, monthCrossFilter), [kpisBackend, monthCrossFilter])
   const clientesQueryInput = useMemo(() => withMonth(clientesBackend, monthCrossFilter), [clientesBackend, monthCrossFilter])
@@ -542,35 +449,8 @@ export default function HistoricoClientes() {
     volume: (clientes ?? []).reduce((s, r) => s + r.volume, 0),
   }), [clientes])
 
-  function applyFiltros() {
-    const next = { ...pending }
-    if (!next.anos.length) next.anos = [currentYear]
-    setApplied(next)
-    setCrossFilter(null)
-    setExpandedParc(null)
-    setMonthCrossFilter(null)
-    setProductCrossFilter(null)
-    setUpdatedAt(new Date())
-  }
-
-  function clearFiltros() {
-    const reset: FiltrosH = { anos: [currentYear], meses: [], codParcs: [], mercados: [], gruposProduto: [], vendedores: [] }
-    setPending(reset)
-    setApplied(reset)
-    setCrossFilter(null)
-    setExpandedParc(null)
-    setMonthCrossFilter(null)
-    setProductCrossFilter(null)
-    setUpdatedAt(new Date())
-  }
-
-  const clienteOpts = useMemo(() =>
-    (filtrosData?.clientes ?? []).map(c => ({ value: String(c.codParc), label: c.razaoSocial })),
-    [filtrosData]
-  )
-
   return (
-    <div className="space-y-4" onClick={() => {}}>
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
@@ -588,65 +468,7 @@ export default function HistoricoClientes() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-        <div className="flex flex-wrap gap-3 items-end">
-          <MultiSelectField
-            label="Ano"
-            selected={pending.anos.map(String)}
-            options={anosOpts.map(String)}
-            onChange={v => setPending(p => ({ ...p, anos: v.length ? v.map(Number) : [currentYear] }))}
-            minWidth="80px"
-          />
-          <MultiSelectField
-            label="Mês"
-            selected={pending.meses.map(String)}
-            options={MESES_FULL.map((m, i) => ({ value: String(i + 1), label: m }))}
-            onChange={v => setPending(p => ({ ...p, meses: v.map(Number) }))}
-            minWidth="110px"
-          />
-          <MultiSelectField
-            label="Cliente"
-            selected={pending.codParcs.map(String)}
-            options={clienteOpts}
-            onChange={v => setPending(p => ({ ...p, codParcs: v.map(Number) }))}
-            minWidth="260px"
-            searchable
-          />
-          <MultiSelectField
-            label="Mercado"
-            selected={pending.mercados}
-            options={filtrosData?.mercados ?? []}
-            onChange={v => setPending(p => ({ ...p, mercados: v }))}
-          />
-          <MultiSelectField
-            label="Produtos (grupo)"
-            selected={pending.gruposProduto}
-            options={filtrosData?.gruposProduto ?? []}
-            onChange={v => setPending(p => ({ ...p, gruposProduto: v }))}
-          />
-          <MultiSelectField
-            label="Vendedor"
-            selected={pending.vendedores}
-            options={filtrosData?.vendedores ?? []}
-            onChange={v => setPending(p => ({ ...p, vendedores: v }))}
-          />
-          <div className="flex gap-2 ml-auto">
-            <button
-              onClick={clearFiltros}
-              className="px-4 py-1.5 border border-slate-600 text-slate-300 rounded-lg text-sm hover:bg-slate-700 transition-colors"
-            >
-              Limpar filtros
-            </button>
-            <button
-              onClick={applyFiltros}
-              className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
-            >
-              Aplicar filtros
-            </button>
-          </div>
-        </div>
-      </div>
+      <FiltrosGlobais filtros={filtros} onChange={setFiltros} showProjetos={false} showTipoReceita={false} />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
@@ -702,7 +524,7 @@ export default function HistoricoClientes() {
             <p className="text-sm font-semibold text-white">Evolução Mensal (KG)</p>
             <div className="flex items-center gap-3 mt-1">
               <span className="flex items-center gap-1 text-[10px] text-slate-400">
-                <span className="w-2.5 h-2.5 rounded-sm bg-green-500" /> Volume (KG)
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#4F9D6E' }} /> Volume (KG)
               </span>
               <span className="flex items-center gap-1 text-[10px] text-slate-400">
                 <span className="w-4 border-t-2 border-dashed border-white/40" /> Preço Médio (R$)
@@ -718,11 +540,11 @@ export default function HistoricoClientes() {
                 <YAxis yAxisId="pm" orientation="right" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false}
                   tickFormatter={v => `R$${v.toFixed(0)}`} />
                 <Tooltip content={<ChartTooltip />} />
-                <Bar yAxisId="vol" dataKey="volume" name="Volume kg" fill="#22c55e" radius={[3, 3, 0, 0]}
+                <Bar yAxisId="vol" dataKey="volume" name="Volume kg" fill="#4F9D6E" radius={[3, 3, 0, 0]}
                   style={{ cursor: 'pointer' }}
                   onClick={(_d: unknown, index: number) => handleMonthClick(index + 1)}>
                   {evolucaoChart.map((_e, i) => (
-                    <Cell key={i} fill="#22c55e" opacity={monthCrossFilter === null || monthCrossFilter === i + 1 ? 1 : 0.25} />
+                    <Cell key={i} fill="#4F9D6E" opacity={monthCrossFilter === null || monthCrossFilter === i + 1 ? 1 : 0.25} />
                   ))}
                 </Bar>
                 <Line yAxisId="pm" type="monotone" dataKey="precoMedio" name="Preço Médio R$"
@@ -738,7 +560,7 @@ export default function HistoricoClientes() {
             <p className="text-sm font-semibold text-white">Evolução Mensal (Faturamento)</p>
             <div className="flex items-center gap-3 mt-1">
               <span className="flex items-center gap-1 text-[10px] text-slate-400">
-                <span className="w-2.5 h-2.5 rounded-sm bg-blue-500" /> Faturamento (R$)
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#4F7CAC' }} /> Faturamento (R$)
               </span>
               <span className="flex items-center gap-1 text-[10px] text-slate-400">
                 <span className="w-4 border-t-2 border-dashed border-white/40" /> Preço Médio (R$)
@@ -754,11 +576,11 @@ export default function HistoricoClientes() {
                 <YAxis yAxisId="pm" orientation="right" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false}
                   tickFormatter={v => `R$${v.toFixed(0)}`} />
                 <Tooltip content={<ChartTooltip />} />
-                <Bar yAxisId="fat" dataKey="valor" name="Faturamento R$" fill="#3b82f6" radius={[3, 3, 0, 0]}
+                <Bar yAxisId="fat" dataKey="valor" name="Faturamento R$" fill="#4F7CAC" radius={[3, 3, 0, 0]}
                   style={{ cursor: 'pointer' }}
                   onClick={(_d: unknown, index: number) => handleMonthClick(index + 1)}>
                   {evolucaoChart.map((_e, i) => (
-                    <Cell key={i} fill="#3b82f6" opacity={monthCrossFilter === null || monthCrossFilter === i + 1 ? 1 : 0.25} />
+                    <Cell key={i} fill="#4F7CAC" opacity={monthCrossFilter === null || monthCrossFilter === i + 1 ? 1 : 0.25} />
                   ))}
                 </Bar>
                 <Line yAxisId="pm" type="monotone" dataKey="precoMedio" name="Preço Médio R$"
@@ -835,7 +657,7 @@ export default function HistoricoClientes() {
                       key={c.codParc}
                       c={c}
                       rank={i + 1}
-                      applied={applied}
+                      baseFiltros={toBackend(filtros)}
                       isExpanded={expandedParc === c.codParc}
                       onToggle={() => toggleCliente(c.codParc)}
                       dimmed={expandedParc !== null && expandedParc !== c.codParc}

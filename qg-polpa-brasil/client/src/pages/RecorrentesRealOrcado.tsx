@@ -2,16 +2,21 @@ import { Fragment, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { formatCurrency, formatKg } from '../lib/utils'
 import { ChevronDown, ChevronRight, TrendingUp, TrendingDown, Package, DollarSign } from 'lucide-react'
+import FiltrosGlobais, { type Filtros } from '../components/FiltrosGlobais'
 import {
-  getRecorrentesFiltros,
   getRecorrentesKpis,
   getRecorrentesProdutos,
   getRecorrentesTabela,
   type RecorrentesFiltros,
 } from '../lib/api'
 
-const DEFAULT_INI = '2026-01-01'
-const DEFAULT_FIM = '2026-12-31'
+const DEFAULT_FILTROS: Filtros = { dataInicio: '2026-01-01', dataFim: '2026-12-31' }
+
+const LINHAS_VISIVEIS = 25
+const ALTURA_LINHA_PX = 37
+const ALTURA_CABECALHO_PX = 38
+const ALTURA_TOTAIS_PX = 40
+const ALTURA_TABELA_PX = ALTURA_CABECALHO_PX + ALTURA_TOTAIS_PX + LINHAS_VISIVEIS * ALTURA_LINHA_PX
 
 type SortKey = 'razaoSocial' | 'volAtual' | 'pctVol' | 'orcKg' | 'pctKg' | 'fatAtual' | 'pctFat' | 'orcVal' | 'pctVal' | 'dif'
 type SortDir = 'asc' | 'desc'
@@ -103,26 +108,19 @@ function ProdutosRow({ codParc, filtros }: { codParc: number; filtros: Recorrent
 }
 
 export default function RecorrentesRealOrcado() {
-  const [dataInicio, setDataInicio] = useState(DEFAULT_INI)
-  const [dataFim,    setDataFim]    = useState(DEFAULT_FIM)
-  const [mercado,    setMercado]    = useState('')
-  const [vendedor,   setVendedor]   = useState('')
-  const [expanded,   setExpanded]   = useState<Set<number>>(new Set())
-  const [sortKey,    setSortKey]    = useState<SortKey>('volAtual')
-  const [sortDir,    setSortDir]    = useState<SortDir>('desc')
-
-  const { data: opFiltros } = useQuery({
-    queryKey: ['recorrentes', 'filtros'],
-    queryFn: getRecorrentesFiltros,
-    staleTime: 5 * 60_000,
-  })
+  const [filtrosGlobais, setFiltrosGlobais] = useState<Filtros>(DEFAULT_FILTROS)
+  const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const [sortKey,  setSortKey]  = useState<SortKey>('volAtual')
+  const [sortDir,  setSortDir]  = useState<SortDir>('desc')
 
   const filtros = useMemo<RecorrentesFiltros>(() => ({
-    dataInicio: dataInicio || undefined,
-    dataFim:    dataFim    || undefined,
-    mercados:   mercado    ? [mercado]  : undefined,
-    vendedores: vendedor   ? [vendedor] : undefined,
-  }), [dataInicio, dataFim, mercado, vendedor])
+    dataInicio:    filtrosGlobais.dataInicio,
+    dataFim:       filtrosGlobais.dataFim,
+    mercados:      filtrosGlobais.mercados?.length ? filtrosGlobais.mercados : undefined,
+    vendedores:    filtrosGlobais.vendedores?.length ? filtrosGlobais.vendedores : undefined,
+    codParcs:      filtrosGlobais.codParcs?.length ? filtrosGlobais.codParcs : undefined,
+    gruposProduto: filtrosGlobais.gruposProduto?.length ? filtrosGlobais.gruposProduto : undefined,
+  }), [filtrosGlobais])
 
   const { data: kpis,   isLoading: kpiLoad   } = useQuery({
     queryKey: ['recorrentes', 'kpis', filtros],
@@ -180,7 +178,6 @@ export default function RecorrentesRealOrcado() {
     return next
   })
 
-  const selectCls = 'bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-green-500 cursor-pointer'
   const sp = { cur: sortKey, dir: sortDir, onSort: handleSort }
 
   return (
@@ -190,36 +187,7 @@ export default function RecorrentesRealOrcado() {
         <p className="text-slate-400 text-sm mt-0.5">Comparativo entre faturamento realizado e orçamento do projeto Recorrentes</p>
       </div>
 
-      <div className="flex flex-wrap gap-3 items-end bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Data Início</label>
-          <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className={selectCls} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Data Fim</label>
-          <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className={selectCls} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Mercado</label>
-          <select value={mercado} onChange={e => setMercado(e.target.value)} className={selectCls}>
-            <option value="">Todos</option>
-            {(opFiltros?.mercados ?? []).map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Vendedor</label>
-          <select value={vendedor} onChange={e => setVendedor(e.target.value)} className={selectCls}>
-            <option value="">Todos</option>
-            {(opFiltros?.vendedores ?? []).map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
-        </div>
-        {(mercado || vendedor || dataInicio !== DEFAULT_INI || dataFim !== DEFAULT_FIM) && (
-          <button onClick={() => { setMercado(''); setVendedor(''); setDataInicio(DEFAULT_INI); setDataFim(DEFAULT_FIM) }}
-            className="text-[11px] font-semibold text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-400/50 rounded-lg px-3 py-2 transition-colors">
-            Limpar filtros
-          </button>
-        )}
-      </div>
+      <FiltrosGlobais filtros={filtrosGlobais} onChange={setFiltrosGlobais} showProjetos={false} showTipoReceita={false} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard label="Faturamento Real" icon={DollarSign} color="border-l-green-500"
@@ -235,9 +203,9 @@ export default function RecorrentesRealOrcado() {
       </div>
 
       <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto" style={{ maxHeight: `${ALTURA_TABELA_PX}px` }}>
           <table className="w-full text-xs min-w-[960px]">
-            <thead>
+            <thead className="sticky top-0 z-20 bg-slate-900">
               <tr className="border-b border-slate-700 bg-slate-900/40">
                 <SortTh label="Código — Cliente"  col="razaoSocial" {...sp} left />
                 <SortTh label="Vol. Real KG"      col="volAtual"    {...sp} />
@@ -250,6 +218,32 @@ export default function RecorrentesRealOrcado() {
                 <SortTh label="Δ R$"              col="pctVal"      {...sp} />
                 <SortTh label="Dif. R$"           col="dif"         {...sp} />
               </tr>
+
+              {/* Linha de totais — fixa no topo, junto com o cabeçalho */}
+              {!tabelaLoad && sortedData.length > 0 && (() => {
+                const tVol  = sortedData.reduce((s, r) => s + r.vol, 0)
+                const tOrcKg = sortedData.reduce((s, r) => s + r.orcKg, 0)
+                const tFat  = sortedData.reduce((s, r) => s + r.fat, 0)
+                const tOrc  = sortedData.reduce((s, r) => s + r.orcVal, 0)
+                const pKg   = calcPct(tVol, tOrcKg)
+                const pVal  = calcPct(tFat, tOrc)
+                const dif   = tFat - tOrc
+                const fmt2  = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                return (
+                  <tr className="sticky top-[38px] z-20 border-b-2 border-slate-600 bg-slate-900/95 font-semibold text-white text-xs">
+                    <td className="px-3 py-2.5">Total</td>
+                    <td className="px-2 py-2.5 text-right whitespace-nowrap">{fmt2(tVol)}</td>
+                    <td className="px-2 py-2.5 text-right text-slate-400">100%</td>
+                    <td className="px-2 py-2.5 text-right whitespace-nowrap">{fmt2(tOrcKg)}</td>
+                    <td className={`px-2 py-2.5 text-right whitespace-nowrap ${pKg != null ? pctColor(pKg) : ''}`}>{pKg != null ? fmtPct(pKg) : '—'}</td>
+                    <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatCurrency(tFat)}</td>
+                    <td className="px-2 py-2.5 text-right text-slate-400">100%</td>
+                    <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatCurrency(tOrc)}</td>
+                    <td className={`px-2 py-2.5 text-right whitespace-nowrap ${pVal != null ? pctColor(pVal) : ''}`}>{pVal != null ? fmtPct(pVal) : '—'}</td>
+                    <td className={`px-2 py-2.5 text-right whitespace-nowrap ${difColor(dif)}`}>{formatCurrency(dif)}</td>
+                  </tr>
+                )
+              })()}
             </thead>
             <tbody className="divide-y divide-slate-700/40">
               {tabelaLoad && (
@@ -284,31 +278,6 @@ export default function RecorrentesRealOrcado() {
                   </Fragment>
                 )
               })}
-
-              {!tabelaLoad && sortedData.length > 0 && (() => {
-                const tVol  = sortedData.reduce((s, r) => s + r.vol, 0)
-                const tOrcKg = sortedData.reduce((s, r) => s + r.orcKg, 0)
-                const tFat  = sortedData.reduce((s, r) => s + r.fat, 0)
-                const tOrc  = sortedData.reduce((s, r) => s + r.orcVal, 0)
-                const pKg   = calcPct(tVol, tOrcKg)
-                const pVal  = calcPct(tFat, tOrc)
-                const dif   = tFat - tOrc
-                const fmt2  = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                return (
-                  <tr className="border-t-2 border-slate-600 bg-slate-900/60 font-semibold text-white text-xs">
-                    <td className="px-3 py-2.5">Total</td>
-                    <td className="px-2 py-2.5 text-right whitespace-nowrap">{fmt2(tVol)}</td>
-                    <td className="px-2 py-2.5 text-right text-slate-400">100%</td>
-                    <td className="px-2 py-2.5 text-right whitespace-nowrap">{fmt2(tOrcKg)}</td>
-                    <td className={`px-2 py-2.5 text-right whitespace-nowrap ${pKg != null ? pctColor(pKg) : ''}`}>{pKg != null ? fmtPct(pKg) : '—'}</td>
-                    <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatCurrency(tFat)}</td>
-                    <td className="px-2 py-2.5 text-right text-slate-400">100%</td>
-                    <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatCurrency(tOrc)}</td>
-                    <td className={`px-2 py-2.5 text-right whitespace-nowrap ${pVal != null ? pctColor(pVal) : ''}`}>{pVal != null ? fmtPct(pVal) : '—'}</td>
-                    <td className={`px-2 py-2.5 text-right whitespace-nowrap ${difColor(dif)}`}>{formatCurrency(dif)}</td>
-                  </tr>
-                )
-              })()}
             </tbody>
           </table>
         </div>

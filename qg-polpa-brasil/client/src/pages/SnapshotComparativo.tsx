@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import FiltrosGlobais, { type Filtros } from '../components/FiltrosGlobais'
 import { formatCurrency } from '../lib/utils'
-import { History, ChevronRight, ChevronDown, Camera, AlertCircle } from 'lucide-react'
+import { History, ChevronRight, ChevronDown, Camera, AlertCircle, ArrowUpDown, Filter } from 'lucide-react'
 import {
   getSnapshotDatas,
   getSnapshotHistorico,
@@ -12,6 +12,18 @@ import {
 } from '../lib/api'
 
 const DEFAULT_FILTROS: Filtros = { dataInicio: '2026-01-01', dataFim: '2026-12-31' }
+
+const LINHAS_VISIVEIS = 25
+const ALTURA_LINHA_PX = 38
+const ALTURA_CABECALHO_PX = 40
+const ALTURA_TOTAIS_PX = 40
+const ALTURA_TABELA_PX = ALTURA_CABECALHO_PX + ALTURA_TOTAIS_PX + LINHAS_VISIVEIS * ALTURA_LINHA_PX
+
+// Variação = Atual - semana anterior (último snapshot disponível antes do "Atual")
+function deltaVsSemanaAnterior(currValor: number, dates: string[], snapshots: Record<string, { valor: number }>) {
+  const semanaAnterior = dates.length > 0 ? (snapshots[dates[dates.length - 1]]?.valor ?? 0) : 0
+  return currValor - semanaAnterior
+}
 
 // Formata "2026-05-23" → "23/05"
 function fmtDate(iso: string) {
@@ -65,12 +77,7 @@ function ClienteRow({ row, dates, filtros }: { row: SnapshotClienteRow; dates: s
     staleTime: 60_000,
   })
 
-  const allValues = [
-    ...dates.map(d => row.snapshots[d]?.valor ?? 0),
-    row.currValor,
-  ]
-  const firstNonZero = allValues.find(v => v > 0) ?? 0
-  const deltaTotal = row.currValor - firstNonZero
+  const deltaTotal = deltaVsSemanaAnterior(row.currValor, dates, row.snapshots)
 
   return (
     <>
@@ -116,12 +123,7 @@ function ClienteRow({ row, dates, filtros }: { row: SnapshotClienteRow; dates: s
 
       {/* Linhas de produto (expansão) */}
       {expanded && (detalhe?.rows ?? []).map((p: SnapshotProdutoRow) => {
-        const pAllValues = [
-          ...dates.map(d => p.snapshots[d]?.valor ?? 0),
-          p.currValor,
-        ]
-        const pFirst = pAllValues.find(v => v > 0) ?? 0
-        const pDelta = p.currValor - pFirst
+        const pDelta = deltaVsSemanaAnterior(p.currValor, dates, p.snapshots)
         return (
           <tr key={p.codProduto} className="bg-slate-900/50 border-b border-slate-700/20">
             <td className="pl-10 pr-3 py-1.5 sticky left-0 bg-slate-900/50 z-10 border-r border-slate-700/40">
@@ -157,6 +159,8 @@ function ClienteRow({ row, dates, filtros }: { row: SnapshotClienteRow; dates: s
 
 export default function SnapshotComparativo() {
   const [filtros, setFiltros] = useState<Filtros>(DEFAULT_FILTROS)
+  const [ordemDesc, setOrdemDesc] = useState(true)
+  const [apenasComVariacao, setApenasComVariacao] = useState(false)
 
   const { data: info } = useQuery({
     queryKey: ['snapshot', 'datas'],
@@ -173,6 +177,15 @@ export default function SnapshotComparativo() {
   const rows   = data?.rows  ?? []
   const hasDates = dates.length > 0
 
+  const rowsExibidas = useMemo(() => {
+    let lista = rows
+    if (apenasComVariacao) {
+      lista = lista.filter(r => Math.abs(deltaVsSemanaAnterior(r.currValor, dates, r.snapshots)) > 50)
+    }
+    lista = [...lista].sort((a, b) => ordemDesc ? b.currValor - a.currValor : a.currValor - b.currValor)
+    return lista
+  }, [rows, dates, apenasComVariacao, ordemDesc])
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -183,7 +196,7 @@ export default function SnapshotComparativo() {
             Comparativo Semanal
           </h1>
           <p className="text-slate-400 text-sm mt-0.5">
-            Evolução da previsão de vendas — uma coluna por sexta-feira
+            Evolução da previsão de vendas — uma coluna por semana · dados fixados toda quarta-feira às 08h30
           </p>
         </div>
 
@@ -211,7 +224,7 @@ export default function SnapshotComparativo() {
           <div className="text-center">
             <p className="text-white font-semibold">Nenhum snapshot disponível</p>
             <p className="text-slate-400 text-sm mt-1">
-              O sistema congela automaticamente toda sexta-feira às 17h.
+              O sistema congela automaticamente toda quarta-feira às 08h30.
             </p>
           </div>
         </div>
@@ -220,16 +233,39 @@ export default function SnapshotComparativo() {
       {/* Tabela pivot */}
       {(hasDates || isLoading) && (
         <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-700 flex items-center gap-3">
+          <div className="px-5 py-3 border-b border-slate-700 flex items-center gap-3 flex-wrap">
             <p className="text-sm font-semibold text-white">Evolução por Cliente</p>
-            <span className="text-xs text-slate-500">{rows.length} clientes</span>
+            <span className="text-xs text-slate-500">{rowsExibidas.length} de {rows.length} clientes</span>
+
+            <button
+              onClick={() => setOrdemDesc(v => !v)}
+              className="flex items-center gap-1.5 text-[11px] font-medium text-slate-300 hover:text-white bg-slate-700/60 hover:bg-slate-700 border border-slate-600 rounded-md px-2.5 py-1 transition-colors"
+              title="Ordenar pelo valor Atual"
+            >
+              <ArrowUpDown className="w-3 h-3" />
+              {ordemDesc ? 'Maior → Menor' : 'Menor → Maior'}
+            </button>
+
+            <button
+              onClick={() => setApenasComVariacao(v => !v)}
+              className={`flex items-center gap-1.5 text-[11px] font-medium rounded-md px-2.5 py-1 border transition-colors ${
+                apenasComVariacao
+                  ? 'bg-violet-500/20 text-violet-300 border-violet-500/50'
+                  : 'bg-slate-700/60 text-slate-300 border-slate-600 hover:bg-slate-700 hover:text-white'
+              }`}
+              title="Mostrar apenas quem teve variação em relação à semana anterior"
+            >
+              <Filter className="w-3 h-3" />
+              Apenas com variação
+            </button>
+
             <span className="ml-auto text-[11px] text-slate-500 flex items-center gap-1">
               <span className="w-2 h-2 rounded-sm bg-green-500/50" /> aumento vs. semana anterior
               <span className="w-2 h-2 rounded-sm bg-red-500/50 ml-2" /> redução
             </span>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-auto" style={{ maxHeight: `${ALTURA_TABELA_PX}px` }}>
             <table className="w-full text-xs" style={{ minWidth: `${280 + dates.length * 110 + 120 + 90}px` }}>
               <thead className="bg-slate-800 sticky top-0 z-20">
                 <tr className="border-b border-slate-700">
@@ -247,43 +283,22 @@ export default function SnapshotComparativo() {
                   <th className="text-right px-2 py-2.5 font-semibold text-green-400 w-[110px] whitespace-nowrap">
                     Atual
                   </th>
-                  {/* Δ Total */}
+                  {/* Variação */}
                   <th className="text-right px-2 py-2.5 font-medium text-slate-400 w-[90px] border-l border-slate-700/40 whitespace-nowrap">
-                    Δ Total
+                    Variação
                   </th>
                 </tr>
-              </thead>
-              <tbody>
-                {isLoading
-                  ? Array.from({ length: 10 }).map((_, i) => (
-                      <tr key={i} className="border-b border-slate-700/30 animate-pulse">
-                        <td className="px-3 py-2 sticky left-0 bg-slate-800 border-r border-slate-700/40">
-                          <div className="h-3 bg-slate-700 rounded w-40" />
-                        </td>
-                        {Array.from({ length: dates.length + 2 }).map((_, j) => (
-                          <td key={j} className="px-2 py-2">
-                            <div className="h-3 bg-slate-700 rounded w-full" />
-                          </td>
-                        ))}
-                      </tr>
-                    ))
-                  : rows.map((row: SnapshotClienteRow) => (
-                      <ClienteRow key={row.codParc} row={row} dates={dates} filtros={filtros} />
-                    ))
-                }
-              </tbody>
 
-              {/* Linha de totais */}
-              {!isLoading && rows.length > 0 && (() => {
-                const totSnap: Record<string, number> = {}
-                dates.forEach(d => { totSnap[d] = rows.reduce((s, r) => s + (r.snapshots[d]?.valor ?? 0), 0) })
-                const totCurr = rows.reduce((s, r) => s + r.currValor, 0)
-                const firstDate = dates[0]
-                const totDelta = totCurr - (firstDate ? totSnap[firstDate] : 0)
-                return (
-                  <tfoot>
-                    <tr className="border-t-2 border-slate-600 bg-slate-700/40">
-                      <td className="px-3 py-2.5 sticky left-0 bg-slate-700/60 z-10 border-r border-slate-600 font-semibold text-slate-300 text-xs">
+                {/* Linha de somatória — fixa no topo, junto com o cabeçalho */}
+                {!isLoading && rowsExibidas.length > 0 && (() => {
+                  const totSnap: Record<string, number> = {}
+                  dates.forEach(d => { totSnap[d] = rowsExibidas.reduce((s, r) => s + (r.snapshots[d]?.valor ?? 0), 0) })
+                  const totCurr = rowsExibidas.reduce((s, r) => s + r.currValor, 0)
+                  const semanaAnteriorTotal = dates.length > 0 ? (totSnap[dates[dates.length - 1]] ?? 0) : 0
+                  const totDelta = totCurr - semanaAnteriorTotal
+                  return (
+                    <tr className="border-b-2 border-slate-600 bg-slate-700/40 sticky top-[40px] z-20">
+                      <td className="px-3 py-2.5 sticky left-0 bg-slate-700/60 z-20 border-r border-slate-600 font-semibold text-slate-300 text-xs">
                         TOTAL
                       </td>
                       {dates.map((d, i) => {
@@ -316,16 +331,35 @@ export default function SnapshotComparativo() {
                           </td>
                         )
                       })()}
-                      {/* Δ Total */}
+                      {/* Variação total */}
                       <td className="px-2 py-2.5 text-right border-l border-slate-600 whitespace-nowrap">
                         <span className={`text-xs font-bold ${totDelta > 0 ? 'text-green-400' : totDelta < 0 ? 'text-red-400' : 'text-slate-500'}`}>
                           {Math.abs(totDelta) < 50 ? '—' : `${totDelta > 0 ? '+' : ''}${compact(totDelta)}`}
                         </span>
                       </td>
                     </tr>
-                  </tfoot>
-                )
-              })()}
+                  )
+                })()}
+              </thead>
+              <tbody>
+                {isLoading
+                  ? Array.from({ length: 10 }).map((_, i) => (
+                      <tr key={i} className="border-b border-slate-700/30 animate-pulse">
+                        <td className="px-3 py-2 sticky left-0 bg-slate-800 border-r border-slate-700/40">
+                          <div className="h-3 bg-slate-700 rounded w-40" />
+                        </td>
+                        {Array.from({ length: dates.length + 2 }).map((_, j) => (
+                          <td key={j} className="px-2 py-2">
+                            <div className="h-3 bg-slate-700 rounded w-full" />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  : rowsExibidas.map((row: SnapshotClienteRow) => (
+                      <ClienteRow key={row.codParc} row={row} dates={dates} filtros={filtros} />
+                    ))
+                }
+              </tbody>
             </table>
           </div>
         </div>

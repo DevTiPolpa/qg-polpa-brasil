@@ -6,8 +6,6 @@ import ChangePassword from './pages/ChangePassword'
 import DashboardLayout from './components/DashboardLayout'
 import Dashboard from './pages/Dashboard'
 import Vendedores from './pages/Vendedores'
-import Clientes from './pages/Clientes'
-import Produtos from './pages/Produtos'
 import Usuarios from './pages/Usuarios'
 import Metas from './pages/Metas'
 import NovosProjetos from './pages/NovosProjetos'
@@ -58,15 +56,13 @@ function AppRoutes() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/vendedores" component={Vendedores} />
-        <Route path="/clientes" component={Clientes} />
-        <Route path="/produtos" component={Produtos} />
         <Route path="/projetos" component={NovosProjetos} />
         <Route path="/recorrentes" component={RecorrentesRealOrcado} />
         <Route path="/snapshot" component={SnapshotComparativo} />
         <Route path="/historico-clientes" component={HistoricoClientes} />
         <Route path="/funil-vendas" component={FunilVendas} />
         <Route path="/panorama-crm" component={PanoramaCrm} />
-        <Route path="/chat" component={Chat} />
+        {user.role === 'ADMIN' && <Route path="/chat" component={Chat} />}
         {user.role === 'ADMIN' && <Route path="/usuarios" component={Usuarios} />}
         {user.role === 'ADMIN' && <Route path="/metas" component={Metas} />}
         <Route>

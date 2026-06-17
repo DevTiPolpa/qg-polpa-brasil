@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { getVendedoresOriginalResumo, getVendedoresOriginalClienteMix, type VendedoresOriginalResumo } from '../lib/api'
+import { getVendedoresOriginalResumo, getVendedoresOriginalClienteMix, getVendedoresOriginalClienteProdutoMensal, type VendedoresOriginalResumo } from '../lib/api'
 import FiltrosGlobais, { type Filtros } from '../components/FiltrosGlobais'
 import { formatCurrency, formatNumber, formatKg, formatMes } from '../lib/utils'
 import { TAILWIND, BORDER_L_COLOR } from '../lib/colors'
@@ -167,7 +167,76 @@ function MetaGauge({ fat, meta }: { fat: number; meta: number }) {
   )
 }
 
-function ClienteRow({ c, selected, filtros }: { c: any; selected: string | null; filtros: Filtros }) {
+function ProdutoRow({ codParc, p, filtros }: { codParc: number; p: any; filtros: Filtros }) {
+  const [expanded, setExpanded] = useState(false)
+  const mensalQueryKey = useMemo(() => [
+    'vendedores-original-cliente-produto-mensal',
+    codParc,
+    p.codProduto,
+    filtros.dataInicio,
+    filtros.dataFim,
+    (filtros.mercados ?? []).join('|'),
+    (filtros.vendedores ?? []).join('|'),
+    (filtros.projetos ?? []).join('|'),
+    (filtros.gruposProduto ?? []).join('|'),
+    (filtros.tiposReceita ?? []).join('|'),
+    filtros.uf,
+  ], [codParc, p.codProduto, filtros])
+
+  const { data: mensal = [], isLoading: loadingMensal, error: mensalError } = useQuery({
+    queryKey: mensalQueryKey,
+    queryFn: () => getVendedoresOriginalClienteProdutoMensal(codParc, Number(p.codProduto), filtros as any),
+    enabled: expanded && p.codProduto != null,
+    staleTime: 30_000,
+  })
+
+  return (
+    <>
+      <tr
+        className="bg-slate-900/60 border-l-2 border-l-slate-600 cursor-pointer hover:bg-slate-900/90 transition-colors"
+        onClick={() => setExpanded(e => !e)}
+      >
+        <td className="pl-7 pr-2 py-1.5 text-slate-300 text-[11px]">
+          <span className="flex items-center gap-1.5">
+            {expanded ? <ChevronDown className="w-3 h-3 shrink-0 text-slate-500" /> : <ChevronRight className="w-3 h-3 shrink-0 text-slate-500" />}
+            <span className="text-slate-500 shrink-0">{p.codProduto}</span>
+            <span className="truncate">{p.nomeProduto ?? '—'}</span>
+          </span>
+        </td>
+        <td className="px-2 py-1.5" />
+        <td className="px-2 py-1.5 text-green-500/80 text-[11px] text-right">{formatCurrency(Number(p.faturamento))}</td>
+        <td className="px-2 py-1.5 text-slate-500 text-[11px] text-right">{Math.round(Number(p.volume)).toLocaleString('pt-BR')}</td>
+        <td className="px-2 py-1.5" />
+      </tr>
+      {expanded && loadingMensal && (
+        <tr className="bg-slate-950/60 border-l-2 border-l-slate-700">
+          <td colSpan={5} className="pl-12 pr-2 py-1.5 text-slate-500 text-[11px]">Carregando detalhamento mensal...</td>
+        </tr>
+      )}
+      {expanded && mensalError && (
+        <tr className="bg-slate-950/60 border-l-2 border-l-red-700">
+          <td colSpan={5} className="pl-12 pr-2 py-1.5 text-red-400 text-[11px]">Não foi possível carregar o detalhamento mensal.</td>
+        </tr>
+      )}
+      {expanded && !loadingMensal && !mensalError && (mensal ?? []).length === 0 && (
+        <tr className="bg-slate-950/60 border-l-2 border-l-slate-700">
+          <td colSpan={5} className="pl-12 pr-2 py-1.5 text-slate-500 text-[11px]">Nenhum registro mensal encontrado.</td>
+        </tr>
+      )}
+      {expanded && !loadingMensal && !mensalError && (mensal ?? []).map((m: any) => (
+        <tr key={m.mes} className="bg-slate-950/60 border-l-2 border-l-slate-700">
+          <td className="pl-12 pr-2 py-1 text-slate-400 text-[11px]">{formatMes(m.mes)}</td>
+          <td className="px-2 py-1" />
+          <td className="px-2 py-1 text-green-500/70 text-[11px] text-right">{formatCurrency(Number(m.valor))}</td>
+          <td className="px-2 py-1 text-slate-500 text-[11px] text-right">{Math.round(Number(m.quantidade)).toLocaleString('pt-BR')}</td>
+          <td className="px-2 py-1" />
+        </tr>
+      ))}
+    </>
+  )
+}
+
+function ClienteRow({ c, filtros }: { c: any; filtros: Filtros }) {
   const [expanded, setExpanded] = useState(false)
   const mixQueryKey = useMemo(() => [
     'vendedores-original-cliente-mix',
@@ -205,7 +274,6 @@ function ClienteRow({ c, selected, filtros }: { c: any; selected: string | null;
         <td className="px-2 py-2 text-slate-400 text-center">{c.uf ?? '—'}</td>
         <td className="px-2 py-2 text-green-400 font-semibold text-right">{formatCurrency(Number(c.faturamento))}</td>
         <td className="px-2 py-2 text-slate-400 text-right">{Math.round(Number(c.volume)).toLocaleString('pt-BR')}</td>
-        <td className="px-2 py-2 text-slate-400 text-right">{c.ultimaCompra ? new Date(c.ultimaCompra).toLocaleDateString('pt-BR') : '—'}</td>
         <td className="px-2 py-2 text-right">
           <button className="text-slate-500 hover:text-slate-300 transition-colors text-[10px] flex items-center gap-0.5 ml-auto">
             <ExternalLink className="w-3 h-3" />
@@ -214,29 +282,16 @@ function ClienteRow({ c, selected, filtros }: { c: any; selected: string | null;
       </tr>
       {expanded && loadingMix && (
         <tr className="bg-slate-900/60 border-l-2 border-l-slate-600">
-          <td colSpan={6} className="pl-7 pr-2 py-2 text-slate-500 text-[11px]">Carregando produtos...</td>
+          <td colSpan={5} className="pl-7 pr-2 py-2 text-slate-500 text-[11px]">Carregando produtos...</td>
         </tr>
       )}
       {expanded && mixError && (
         <tr className="bg-slate-900/60 border-l-2 border-l-red-700">
-          <td colSpan={6} className="pl-7 pr-2 py-2 text-red-400 text-[11px]">Não foi possível carregar os produtos deste cliente.</td>
+          <td colSpan={5} className="pl-7 pr-2 py-2 text-red-400 text-[11px]">Não foi possível carregar os produtos deste cliente.</td>
         </tr>
       )}
       {expanded && !loadingMix && !mixError && (mix ?? []).map((p: any) => (
-        <tr key={p.codProduto} className="bg-slate-900/60 border-l-2 border-l-slate-600">
-          <td className="pl-7 pr-2 py-1.5 text-slate-300 text-[11px]">
-            <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0" />
-              <span className="text-slate-500 shrink-0">{p.codProduto}</span>
-              <span className="truncate">{p.nomeProduto ?? '—'}</span>
-            </span>
-          </td>
-          <td className="px-2 py-1.5" />
-          <td className="px-2 py-1.5 text-green-500/80 text-[11px] text-right">{formatCurrency(Number(p.faturamento))}</td>
-          <td className="px-2 py-1.5 text-slate-500 text-[11px] text-right">{Math.round(Number(p.volume)).toLocaleString('pt-BR')}</td>
-          <td className="px-2 py-1.5 text-slate-500 text-[11px] text-right">{p.ultimaCompra ? new Date(p.ultimaCompra).toLocaleDateString('pt-BR') : '—'}</td>
-          <td className="px-2 py-1.5" />
-        </tr>
+        <ProdutoRow key={p.codProduto} codParc={Number(c.codParc)} p={p} filtros={filtros} />
       ))}
     </>
   )
@@ -278,6 +333,7 @@ export default function Vendedores() {
       projetos: filtrosApi.projetos,
       gruposProduto: filtrosApi.gruposProduto,
       tiposReceita: filtrosApi.tiposReceita,
+      codParcs: filtrosApi.codParcs,
       limitClientes: 100,
     })
       .then(data => { if (ativo) setResumo(data) })
@@ -292,6 +348,7 @@ export default function Vendedores() {
     JSON.stringify(filtrosApi.projetos ?? []),
     JSON.stringify(filtrosApi.gruposProduto ?? []),
     JSON.stringify(filtrosApi.tiposReceita ?? []),
+    JSON.stringify(filtrosApi.codParcs ?? []),
   ])
 
   const metasRaw = resumo?.metas ?? []
@@ -346,6 +403,20 @@ export default function Vendedores() {
   }, [metasRaw, filtros.dataInicio, filtros.dataFim])
 
   const totalMeta = Object.values(metasPorVendedor).reduce((s, v) => s + v, 0)
+
+  // Vendedores com meta cadastrada mas sem nenhuma venda no período: exibidos com resultado zerado
+  const listaCompleta = useMemo(() => {
+    const existentes = new Set((lista ?? []).map(v => v.nomeVendedor))
+    const extras = Object.keys(metasPorVendedor)
+      .filter(nome => !existentes.has(nome))
+      .map(nome => ({
+        nomeVendedor: nome,
+        faturamento: 0, volume: 0, clientes: 0, produtos: 0,
+        vendaFirme: 0, forecast: 0, novoProjeto: 0,
+        fatNovoProjeto: 0, fatRecorrente: 0,
+      }))
+    return [...(lista ?? []), ...extras]
+  }, [lista, metasPorVendedor])
 
   // Lookup: nomeVendedor → KPIs CRM
   const crmKpiByVendedor = useMemo(() => {
@@ -610,15 +681,15 @@ export default function Vendedores() {
                     itemStyle={{ color: '#fff' }}
                   />
                   <Line type="monotone" dataKey="Faturamento" stroke="#16a34a" strokeWidth={2} dot={{ fill: '#16a34a', r: 3, strokeWidth: 0 }} activeDot={{ r: 5, fill: '#22c55e' }} />
-                  <Line type="monotone" dataKey="Meta" stroke="#f97316" strokeWidth={1.5} strokeDasharray="5 4" dot={false} activeDot={{ r: 4, fill: '#f97316' }} connectNulls />
-                  {showOrcamento && <Line type="monotone" dataKey="Orçamento" stroke="#64748b" strokeWidth={1.5} strokeDasharray="4 3" dot={false} activeDot={{ r: 4, fill: '#94a3b8' }} connectNulls />}
+                  {!tipoAtivo && <Line type="monotone" dataKey="Meta" stroke="#f97316" strokeWidth={1.5} strokeDasharray="5 4" dot={false} activeDot={{ r: 4, fill: '#f97316' }} connectNulls />}
+                  {showOrcamento && !tipoAtivo && <Line type="monotone" dataKey="Orçamento" stroke="#64748b" strokeWidth={1.5} strokeDasharray="4 3" dot={false} activeDot={{ r: 4, fill: '#94a3b8' }} connectNulls />}
                 </LineChart>
               </ResponsiveContainer>
             )
           })()}
           <div className="flex items-center gap-3 mt-1">
             <span className="flex items-center gap-1.5"><span className="w-4 h-0.5 bg-green-500 inline-block rounded" /><span className="text-[11px] text-slate-500">Faturamento</span></span>
-            <span className="flex items-center gap-1.5"><span className="w-4 border-t border-dashed border-orange-500 inline-block" /><span className="text-[11px] text-slate-500">Meta</span></span>
+            {!tipoAtivo && <span className="flex items-center gap-1.5"><span className="w-4 border-t border-dashed border-orange-500 inline-block" /><span className="text-[11px] text-slate-500">Meta</span></span>}
             {showOrcamento && <span className="flex items-center gap-1.5"><span className="w-4 border-t border-dashed border-slate-500 inline-block" /><span className="text-[11px] text-slate-500">Orçamento</span></span>}
           </div>
         </div>
@@ -658,7 +729,7 @@ export default function Vendedores() {
                 n >= 1_000_000 ? `R$ ${(n / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`
                 : n >= 1_000   ? `R$ ${(n / 1_000).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}k`
                 :                `R$ ${n.toFixed(0)}`
-              return (lista ?? []).map(v => {
+              return listaCompleta.map(v => {
                 const fat  = Number(v.faturamento)
                 const meta = metasPorVendedor[v.nomeVendedor ?? ''] ?? null
                 const crm  = crmKpiByVendedor[v.nomeVendedor ?? ''] ?? null
@@ -712,12 +783,11 @@ export default function Vendedores() {
           <div className="overflow-y-auto max-h-[480px]">
             <table className="w-full table-fixed text-xs">
               <colgroup>
-                <col className="w-[38%]" />
-                <col className="w-[7%]" />
-                <col className="w-[19%]" />
-                <col className="w-[14%]" />
-                <col className="w-[13%]" />
-                <col className="w-[9%]" />
+                <col className="w-[42%]" />
+                <col className="w-[8%]" />
+                <col className="w-[24%]" />
+                <col className="w-[18%]" />
+                <col className="w-[8%]" />
               </colgroup>
               <thead className="sticky top-0 z-10 bg-slate-800">
                 <tr className="border-b border-slate-700 text-slate-500">
@@ -725,13 +795,12 @@ export default function Vendedores() {
                   <th className="text-left px-2 py-2 font-medium">UF</th>
                   <th className="text-right px-2 py-2 font-medium">Faturamento</th>
                   <th className="text-right px-2 py-2 font-medium">Volume</th>
-                  <th className="text-right px-2 py-2 font-medium">Últ. Compra</th>
                   <th className="text-right px-2 py-2 font-medium">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/40">
                 {(clientes ?? []).map((c: any, i: number) => (
-                  <ClienteRow key={`${c.codParc}-${i}`} c={c} selected={selected} filtros={filtrosComTipo} />
+                  <ClienteRow key={`${c.codParc}-${i}`} c={c} filtros={filtrosComTipo} />
                 ))}
               </tbody>
             </table>

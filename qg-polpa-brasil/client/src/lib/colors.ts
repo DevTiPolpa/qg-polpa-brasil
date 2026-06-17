@@ -2,11 +2,11 @@
 // VENDA FIRME = verde | FORECAST = amarelo | NOVO PROJETO = azul | DEVOLUCAO = vermelho
 
 export const COLORS = {
-  VENDA_FIRME:  'oklch(0.50 0.20 145)',   // verde escuro
-  FORECAST:     'oklch(0.65 0.18 85)',     // amarelo escuro
-  NOVO_PROJETO: 'oklch(0.50 0.18 250)',    // azul escuro
-  DEVOLUCAO:    'oklch(0.65 0.22 25)',     // vermelho
-  ORCAMENTO:    'oklch(0.78 0.18 55)',     // laranja/dourado
+  VENDA_FIRME:  '#4F9D6E',   // verde sóbrio (estilo corporate/Power BI)
+  FORECAST:     '#D4A23A',   // dourado/âmbar sóbrio
+  NOVO_PROJETO: '#4F7CAC',   // azul-aço sóbrio
+  DEVOLUCAO:    '#C0504D',   // vermelho terracota sóbrio
+  ORCAMENTO:    '#E0974B',   // laranja sóbrio
 } as const
 
 // Tailwind class equivalents (para className strings)
@@ -19,10 +19,10 @@ export const TAILWIND = {
 
 // border-l-4 para os cards do Dashboard (formato Tailwind arbitrary value)
 export const BORDER_L_COLOR: Record<string, string> = {
-  VENDA_FIRME:  'border-l-[oklch(0.50_0.20_145)]',
-  FORECAST:     'border-l-[oklch(0.65_0.18_85)]',
-  NOVO_PROJETO: 'border-l-[oklch(0.50_0.18_250)]',
-  DEVOLUCAO:    'border-l-[oklch(0.65_0.22_25)]',
+  VENDA_FIRME:  'border-l-[#4F9D6E]',
+  FORECAST:     'border-l-[#D4A23A]',
+  NOVO_PROJETO: 'border-l-[#4F7CAC]',
+  DEVOLUCAO:    'border-l-[#C0504D]',
 }
 
 // Cor para uso em style={{ color/fill/stroke }} inline

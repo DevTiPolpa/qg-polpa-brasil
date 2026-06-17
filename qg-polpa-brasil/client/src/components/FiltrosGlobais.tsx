@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getDashboardOriginalFiltrosDisponiveis } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ export interface Filtros {
   dataInicio?: string;
   dataFim?: string;
   codParc?: number;
+  codParcs?: number[];
   gruposProduto?: string[];
   tiposReceita?: string[];
   mercado?: string;
@@ -229,6 +230,25 @@ export default function FiltrosGlobais({ filtros, onChange, showTipoReceita = tr
     staleTime: 5 * 60 * 1000,
   });
 
+  // Mapas cliente ↔ codParc para o filtro multi-select por cliente
+  const clientesPorLabel = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of disponiveis?.clientes ?? []) {
+      const label = c.razaoSocial?.trim() || `Cliente ${c.codParc}`;
+      if (!map.has(label)) map.set(label, c.codParc);
+    }
+    return map;
+  }, [disponiveis]);
+
+  const labelPorCodParc = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const [label, codParc] of clientesPorLabel.entries()) map.set(codParc, label);
+    return map;
+  }, [clientesPorLabel]);
+
+  const clientesSelecionadosLabels = (filtros.codParcs ?? [])
+    .map((cod) => labelPorCodParc.get(cod) ?? `Cliente ${cod}`);
+
   const limpar = () => onChange({ dataInicio: "2026-01-01", dataFim: "2026-12-31" });
 
   const temFiltrosExtras = Object.entries(filtros).some(([k, v]) => {
@@ -314,6 +334,17 @@ export default function FiltrosGlobais({ filtros, onChange, showTipoReceita = tr
           onChange={(vals) => onChange({ ...filtros, gruposProduto: vals, grupoProduto: vals[0] })}
           placeholder="Todos os grupos"
           className="flex-1 min-w-[130px] max-w-[190px]"
+        />
+        <MultiSelect
+          options={[...clientesPorLabel.keys()].sort((a, b) => a.localeCompare(b))}
+          selected={clientesSelecionadosLabels}
+          onChange={(labels) => {
+            const codParcs = labels.map((l) => clientesPorLabel.get(l)).filter((v): v is number => v != null);
+            onChange({ ...filtros, codParcs, codParc: codParcs[0] });
+          }}
+          placeholder="Todos os clientes"
+          searchable
+          className="flex-1 min-w-[140px] max-w-[210px]"
         />
         {showTipoReceita && (
           <MultiSelect
