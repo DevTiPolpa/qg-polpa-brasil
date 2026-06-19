@@ -200,6 +200,7 @@ export type VendedoresOriginalFiltros = {
   codParc?: number
   codProduto?: number
   codParcs?: number[]
+  codProdutos?: number[]
   limitClientes?: number
 }
 
@@ -350,6 +351,7 @@ export async function getVendedoresOriginalResumo(filtros: VendedoresOriginalFil
   if (filtros.codParc != null) params.set('codParc', String(filtros.codParc))
   if (filtros.codProduto != null) params.set('codProduto', String(filtros.codProduto))
   appendIntArrayParam(params, 'codParcs', filtros.codParcs)
+  appendIntArrayParam(params, 'codProdutos', filtros.codProdutos)
   return apiRequest<VendedoresOriginalResumo>(`/api/vendedores-original/resumo?${params.toString()}`)
 }
 
@@ -399,6 +401,7 @@ export type DashboardOriginalFiltros = {
   codParc?: number
   codProduto?: number
   codParcs?: number[]
+  codProdutos?: number[]
 }
 
 export type DashboardOriginalKpis = {
@@ -501,6 +504,7 @@ export type DashboardOriginalFiltrosDisponiveis = {
   projetos: string[]
   grupos: string[]
   clientes: Array<{ codParc: number; razaoSocial: string | null }>
+  produtosPorGrupo: Record<string, Array<{ codProduto: string; nomeProduto: string | null }>>
 }
 
 export type DashboardOriginalResumo = {
@@ -529,6 +533,7 @@ function appendDashboardFiltros(params: URLSearchParams, filtros: DashboardOrigi
   if (filtros.codParc != null) params.set('codParc', String(filtros.codParc))
   if (filtros.codProduto != null) params.set('codProduto', String(filtros.codProduto))
   appendIntArrayParam(params, 'codParcs', filtros.codParcs)
+  appendIntArrayParam(params, 'codProdutos', filtros.codProdutos)
 }
 
 export async function getDashboardOriginalResumo(filtros: DashboardOriginalFiltros = {}, limitClientes?: number): Promise<DashboardOriginalResumo> {
@@ -572,6 +577,7 @@ export type NovosProjetosFiltros = {
   codParc?: number | null
   codProduto?: number | null
   codParcs?: number[]
+  codProdutos?: number[]
   modoCard?: 'abertos' | 'totais' | null
 }
 
@@ -628,6 +634,7 @@ function buildNovosProjetosParams(filtros: NovosProjetosFiltros = {}, extra?: Re
   appendNovosProjetosArrayParam(params, 'gruposProduto', filtros.gruposProduto)
   appendNovosProjetosArrayParam(params, 'tiposReceita', filtros.tiposReceita)
   appendIntArrayParam(params, 'codParcs', filtros.codParcs)
+  appendIntArrayParam(params, 'codProdutos', filtros.codProdutos)
 
   for (const [key, value] of Object.entries(extra ?? {})) {
     if (value !== null && value !== undefined && value !== '') params.set(key, String(value))
@@ -797,6 +804,16 @@ export async function getHistoricoClienteProdutos(codParc: number, filtros: Hist
   return apiRequest<HistoricoClienteProdutoItem[]>(`/api/historico-clientes/clientes/${codParc}/produtos${buildHistoricoClientesParams(filtros)}`)
 }
 
+export type HistoricoClienteProdutoMensalItem = {
+  mes: string
+  quantidade: number
+  valor: number
+}
+
+export async function getHistoricoClienteProdutoMensal(codParc: number, codProduto: string, filtros: HistoricoClientesFiltros = {}): Promise<HistoricoClienteProdutoMensalItem[]> {
+  return apiRequest<HistoricoClienteProdutoMensalItem[]>(`/api/historico-clientes/clientes/${codParc}/produtos/${encodeURIComponent(codProduto)}/mensal${buildHistoricoClientesParams(filtros)}`)
+}
+
 
 
 // ============================================================
@@ -814,6 +831,7 @@ export type SnapshotFiltros = {
   uf?: string | null
   codParc?: number | null
   codParcs?: number[]
+  codProdutos?: number[]
 }
 
 export type SnapshotInfo = {
@@ -866,6 +884,7 @@ function buildSnapshotParams(filtros: SnapshotFiltros = {}) {
   appendArrayParam(params, 'gruposProduto', filtros.gruposProduto)
   appendArrayParam(params, 'tiposReceita', filtros.tiposReceita)
   appendIntArrayParam(params, 'codParcs', filtros.codParcs)
+  appendIntArrayParam(params, 'codProdutos', filtros.codProdutos)
   const query = params.toString()
   return query ? `?${query}` : ''
 }
@@ -899,6 +918,7 @@ export type RecorrentesFiltros = {
   codParc?: number | null
   codParcs?: number[]
   gruposProduto?: string[]
+  codProdutos?: number[]
 }
 
 export type RecorrentesFiltrosDisponiveis = {
@@ -940,6 +960,7 @@ function buildRecorrentesParams(filtros: RecorrentesFiltros = {}) {
   if (filtros.codParc != null) params.set('codParc', String(filtros.codParc))
   appendIntArrayParam(params, 'codParcs', filtros.codParcs)
   appendArrayParam(params, 'gruposProduto', filtros.gruposProduto)
+  appendIntArrayParam(params, 'codProdutos', filtros.codProdutos)
   const query = params.toString()
   return query ? `?${query}` : ''
 }

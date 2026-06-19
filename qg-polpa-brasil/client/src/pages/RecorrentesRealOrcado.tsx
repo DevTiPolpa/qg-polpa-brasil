@@ -120,6 +120,7 @@ export default function RecorrentesRealOrcado() {
     vendedores:    filtrosGlobais.vendedores?.length ? filtrosGlobais.vendedores : undefined,
     codParcs:      filtrosGlobais.codParcs?.length ? filtrosGlobais.codParcs : undefined,
     gruposProduto: filtrosGlobais.gruposProduto?.length ? filtrosGlobais.gruposProduto : undefined,
+    codProdutos:   filtrosGlobais.codProdutos?.length ? filtrosGlobais.codProdutos : undefined,
   }), [filtrosGlobais])
 
   const { data: kpis,   isLoading: kpiLoad   } = useQuery({

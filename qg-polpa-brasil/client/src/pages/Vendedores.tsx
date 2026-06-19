@@ -334,6 +334,7 @@ export default function Vendedores() {
       gruposProduto: filtrosApi.gruposProduto,
       tiposReceita: filtrosApi.tiposReceita,
       codParcs: filtrosApi.codParcs,
+      codProdutos: filtrosApi.codProdutos,
       limitClientes: 100,
     })
       .then(data => { if (ativo) setResumo(data) })
@@ -349,6 +350,7 @@ export default function Vendedores() {
     JSON.stringify(filtrosApi.gruposProduto ?? []),
     JSON.stringify(filtrosApi.tiposReceita ?? []),
     JSON.stringify(filtrosApi.codParcs ?? []),
+    JSON.stringify(filtrosApi.codProdutos ?? []),
   ])
 
   const metasRaw = resumo?.metas ?? []
@@ -361,15 +363,12 @@ export default function Vendedores() {
   const clientesConsolidados = resumo?.clientesConsolidados ?? []
   const evolucaoVendedor = resumo?.evolucaoMensal ?? []
   const clientesVendedor = resumo?.clientesConsolidados ?? []
-  const todosProjetos = useMemo(() => {
-    const projetos = new Set<string>()
-    for (const m of metasRaw) if (m.projeto) projetos.add(m.projeto)
-    for (const v of lista) {
-      if (Number(v.fatRecorrente ?? 0) > 0) projetos.add('Recorrente')
-      if (Number(v.fatNovoProjeto ?? 0) > 0) projetos.add('Novo Projeto')
-    }
-    return [...projetos].sort().map(projeto => ({ projeto }))
-  }, [metasRaw, lista])
+  // Valores canônicos de fv.projeto / metas_2026.projeto no banco — fixos para que o
+  // filtro sempre case corretamente, independente de haver dados no período selecionado.
+  const todosProjetos = useMemo(
+    () => [{ projeto: 'NOVOS PROJETOS' }, { projeto: 'RECORRENTES' }, { projeto: 'TESTE INDUSTRIAL' }],
+    []
+  )
   const kpisTipo = [
     { tipoReceita: 'VENDA_FIRME', faturamento: Number(resumo?.kpis?.vendaFirme ?? 0) },
     { tipoReceita: 'FORECAST', faturamento: Number(resumo?.kpis?.forecast ?? 0) },
@@ -482,9 +481,21 @@ export default function Vendedores() {
     (filtros.projetos?.length ?? 0) === 0 &&
     (filtros.gruposProduto?.length ?? 0) === 0 &&
     (filtros.tiposReceita?.length ?? 0) === 0 &&
+    (filtros.codParcs?.length ?? 0) === 0 &&
     !tipoAtivo &&
     projetosAtivos.length === 0 &&
     !selected
+
+  // Meta e Orçamento ficam ocultos (mostrando apenas Faturamento) quando o usuário
+  // filtra por Grupo de Produtos, Clientes ou Tipos — essas dimensões não têm
+  // meta/orçamento equivalente, então as linhas de referência perdem o sentido.
+  const ocultaLinhasReferencia =
+    (filtros.gruposProduto?.length ?? 0) > 0 ||
+    (filtros.codParcs?.length ?? 0) > 0 ||
+    (filtros.tiposReceita?.length ?? 0) > 0
+
+  const showMeta = !tipoAtivo && !ocultaLinhasReferencia
+  const showOrcamentoLinha = showOrcamento && !ocultaLinhasReferencia
 
   const limparTudo = () => {
     setFiltros(DEFAULT_FILTROS)
@@ -666,7 +677,7 @@ export default function Vendedores() {
               mes: formatMes(r.mes),
               Faturamento: Number(r.faturamento),
               Meta: metasPorMes[r.mes] ?? null,
-              Orçamento: showOrcamento ? (orcMap[r.mes] ?? null) : undefined,
+              Orçamento: showOrcamentoLinha ? (orcMap[r.mes] ?? null) : undefined,
             }))
             return (
               <ResponsiveContainer width="100%" height={230}>
@@ -681,16 +692,16 @@ export default function Vendedores() {
                     itemStyle={{ color: '#fff' }}
                   />
                   <Line type="monotone" dataKey="Faturamento" stroke="#16a34a" strokeWidth={2} dot={{ fill: '#16a34a', r: 3, strokeWidth: 0 }} activeDot={{ r: 5, fill: '#22c55e' }} />
-                  {!tipoAtivo && <Line type="monotone" dataKey="Meta" stroke="#f97316" strokeWidth={1.5} strokeDasharray="5 4" dot={false} activeDot={{ r: 4, fill: '#f97316' }} connectNulls />}
-                  {showOrcamento && !tipoAtivo && <Line type="monotone" dataKey="Orçamento" stroke="#64748b" strokeWidth={1.5} strokeDasharray="4 3" dot={false} activeDot={{ r: 4, fill: '#94a3b8' }} connectNulls />}
+                  {showMeta && <Line type="monotone" dataKey="Meta" stroke="#f97316" strokeWidth={1.5} strokeDasharray="5 4" dot={false} activeDot={{ r: 4, fill: '#f97316' }} connectNulls />}
+                  {showOrcamentoLinha && <Line type="monotone" dataKey="Orçamento" stroke="#64748b" strokeWidth={1.5} strokeDasharray="4 3" dot={false} activeDot={{ r: 4, fill: '#94a3b8' }} connectNulls />}
                 </LineChart>
               </ResponsiveContainer>
             )
           })()}
           <div className="flex items-center gap-3 mt-1">
             <span className="flex items-center gap-1.5"><span className="w-4 h-0.5 bg-green-500 inline-block rounded" /><span className="text-[11px] text-slate-500">Faturamento</span></span>
-            {!tipoAtivo && <span className="flex items-center gap-1.5"><span className="w-4 border-t border-dashed border-orange-500 inline-block" /><span className="text-[11px] text-slate-500">Meta</span></span>}
-            {showOrcamento && <span className="flex items-center gap-1.5"><span className="w-4 border-t border-dashed border-slate-500 inline-block" /><span className="text-[11px] text-slate-500">Orçamento</span></span>}
+            {showMeta && <span className="flex items-center gap-1.5"><span className="w-4 border-t border-dashed border-orange-500 inline-block" /><span className="text-[11px] text-slate-500">Meta</span></span>}
+            {showOrcamentoLinha && <span className="flex items-center gap-1.5"><span className="w-4 border-t border-dashed border-slate-500 inline-block" /><span className="text-[11px] text-slate-500">Orçamento</span></span>}
           </div>
         </div>
 
@@ -713,22 +724,17 @@ export default function Vendedores() {
             <div className="w-px h-3 bg-slate-700 shrink-0" />
             {/* CRM */}
             <p className="w-[52px] text-center shrink-0">Em And.</p>
-            <p className="w-[80px] text-center shrink-0">Vlr And.</p>
-            <p className="w-[52px] text-center shrink-0">Ganhos</p>
-            <p className="w-[80px] text-center shrink-0">Vlr Ganho</p>
-            <p className="w-[52px] text-center shrink-0">Perdidos</p>
-            <p className="w-[58px] text-center shrink-0">Taxa</p>
-            <p className="w-[46px] text-center shrink-0">Ciclo</p>
+            <p className="w-[90px] text-center shrink-0">Vlr And.</p>
             <div className="w-4 shrink-0" />
           </div>
 
           {/* Linhas */}
           <div className="divide-y divide-slate-700/40">
             {(() => {
-              const fmtM = (n: number) =>
-                n >= 1_000_000 ? `R$ ${(n / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`
-                : n >= 1_000   ? `R$ ${(n / 1_000).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}k`
-                :                `R$ ${n.toFixed(0)}`
+              const fmtM2 = (n: number) =>
+                n >= 1_000_000 ? `R$ ${(n / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}M`
+                : n >= 1_000   ? `R$ ${(n / 1_000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}k`
+                :                `R$ ${n.toFixed(2)}`
               return listaCompleta.map(v => {
                 const fat  = Number(v.faturamento)
                 const meta = metasPorVendedor[v.nomeVendedor ?? ''] ?? null
@@ -749,8 +755,8 @@ export default function Vendedores() {
                     <p className="flex-1 min-w-0 text-sm font-semibold text-white truncate">{v.nomeVendedor ?? 'Sem vendedor'}</p>
 
                     {/* Faturamento */}
-                    <p className="w-[88px] text-right shrink-0 text-sm font-bold text-white">{fmtM(fat)}</p>
-                    <p className="w-[88px] text-right shrink-0 text-sm text-slate-300">{meta != null ? fmtM(meta) : '—'}</p>
+                    <p className="w-[88px] text-right shrink-0 text-sm font-bold text-white">{fmtM2(fat)}</p>
+                    <p className="w-[88px] text-right shrink-0 text-sm text-slate-300">{meta != null ? fmtM2(meta) : '—'}</p>
                     <p className={`w-[72px] text-right shrink-0 text-sm font-bold ${pctColor}`}>
                       {pctAting != null ? `${pctAting.toFixed(1)}%` : '—'}
                     </p>
@@ -760,12 +766,7 @@ export default function Vendedores() {
 
                     {/* CRM */}
                     <p className="w-[52px] text-center shrink-0 text-sm text-white">{crm != null ? crm.emAndamento : '—'}</p>
-                    <p className="w-[80px] text-center shrink-0 text-sm text-white">{crm != null ? fmtM(Number(crm.valorAndamento)) : '—'}</p>
-                    <p className="w-[52px] text-center shrink-0 text-sm font-semibold text-green-400">{crm != null ? crm.ganhos : '—'}</p>
-                    <p className="w-[80px] text-center shrink-0 text-sm text-white">{crm != null ? fmtM(Number(crm.valorGanho)) : '—'}</p>
-                    <p className="w-[52px] text-center shrink-0 text-sm font-semibold text-red-400">{crm != null ? crm.perdidos : '—'}</p>
-                    <p className="w-[58px] text-center shrink-0 text-sm text-white">{crm != null ? `${Number(crm.taxaConversao).toFixed(1)}%` : '—'}</p>
-                    <p className="w-[46px] text-center shrink-0 text-sm text-white">{crm != null ? `${Math.round(Number(crm.cicloGanhos))}d` : '—'}</p>
+                    <p className="w-[90px] text-center shrink-0 text-sm text-white">{crm != null ? fmtM2(Number(crm.valorAndamento)) : '—'}</p>
 
                     <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-300 transition-colors shrink-0" />
                   </button>

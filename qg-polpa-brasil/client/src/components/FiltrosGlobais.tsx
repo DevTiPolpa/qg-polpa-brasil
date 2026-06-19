@@ -21,6 +21,7 @@ export interface Filtros {
   grupoProduto?: string;
   tipoReceita?: string;
   codProduto?: number;
+  codProdutos?: number[];
   uf?: string;
 }
 
@@ -59,17 +60,6 @@ type Atalho = { label: string; get: () => { dataInicio: string; dataFim: string 
 const ATALHOS: Atalho[] = [
   { label: "2026",         get: () => ({ dataInicio: "2026-01-01", dataFim: "2026-12-31" }) },
   { label: "2025",         get: () => ({ dataInicio: "2025-01-01", dataFim: "2025-12-31" }) },
-  { label: "1º Sem 2026",  get: () => ({ dataInicio: "2026-01-01", dataFim: "2026-06-30" }) },
-  { label: "2º Sem 2026",  get: () => ({ dataInicio: "2026-07-01", dataFim: "2026-12-31" }) },
-  {
-    label: "Próx. 3 meses",
-    get: () => {
-      const now = new Date();
-      const inicio = new Date(now.getFullYear(), now.getMonth(), 1);
-      const fim = new Date(now.getFullYear(), now.getMonth() + 3, 0);
-      return { dataInicio: inicio.toISOString().split("T")[0], dataFim: fim.toISOString().split("T")[0] };
-    },
-  },
 ];
 
 function ultimoDia(ano: string, mes: string) {
@@ -234,7 +224,8 @@ export default function FiltrosGlobais({ filtros, onChange, showTipoReceita = tr
   const clientesPorLabel = useMemo(() => {
     const map = new Map<string, number>();
     for (const c of disponiveis?.clientes ?? []) {
-      const label = c.razaoSocial?.trim() || `Cliente ${c.codParc}`;
+      const nome = c.razaoSocial?.trim() || `Cliente ${c.codParc}`;
+      const label = `${c.codParc} - ${nome}`;
       if (!map.has(label)) map.set(label, c.codParc);
     }
     return map;
@@ -247,7 +238,7 @@ export default function FiltrosGlobais({ filtros, onChange, showTipoReceita = tr
   }, [clientesPorLabel]);
 
   const clientesSelecionadosLabels = (filtros.codParcs ?? [])
-    .map((cod) => labelPorCodParc.get(cod) ?? `Cliente ${cod}`);
+    .map((cod) => labelPorCodParc.get(cod) ?? `${cod} - Cliente ${cod}`);
 
   const limpar = () => onChange({ dataInicio: "2026-01-01", dataFim: "2026-12-31" });
 
@@ -334,9 +325,49 @@ export default function FiltrosGlobais({ filtros, onChange, showTipoReceita = tr
           onChange={(vals) => onChange({ ...filtros, gruposProduto: vals, grupoProduto: vals[0] })}
           placeholder="Todos os grupos"
           className="flex-1 min-w-[130px] max-w-[190px]"
+          renderExpand={(grupo) => {
+            const produtos = disponiveis?.produtosPorGrupo?.[grupo] ?? []
+            const codProdutosSelecionados = filtros.codProdutos ?? []
+            const toggleProduto = (codProdutoStr: string) => {
+              const cod = Number(codProdutoStr)
+              if (!Number.isFinite(cod)) return
+              const next = codProdutosSelecionados.includes(cod)
+                ? codProdutosSelecionados.filter((c) => c !== cod)
+                : [...codProdutosSelecionados, cod]
+              onChange({ ...filtros, codProdutos: next })
+            }
+            return produtos.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground py-1">Sem produtos cadastrados.</p>
+            ) : (
+              <ul className="max-h-40 overflow-y-auto space-y-0.5 py-1">
+                {produtos.map((p) => {
+                  const isSelected = codProdutosSelecionados.includes(Number(p.codProduto))
+                  return (
+                    <li key={p.codProduto}>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); toggleProduto(p.codProduto) }}
+                        className="flex items-center gap-1.5 w-full text-left text-[11px] text-muted-foreground hover:text-foreground transition-colors truncate"
+                      >
+                        <span
+                          className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${isSelected ? "bg-primary border-primary" : "border-border"}`}
+                        >
+                          {isSelected && <span className="w-1.5 h-1.5 rounded-sm bg-primary-foreground" />}
+                        </span>
+                        <span className="font-mono text-foreground/70">{p.codProduto}</span>
+                        <span className="truncate">— {p.nomeProduto || "Sem descrição"}</span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )
+          }}
         />
         <MultiSelect
-          options={[...clientesPorLabel.keys()].sort((a, b) => a.localeCompare(b))}
+          options={[...clientesPorLabel.keys()].sort((a, b) =>
+            a.replace(/^\d+\s*-\s*/, "").localeCompare(b.replace(/^\d+\s*-\s*/, ""))
+          )}
           selected={clientesSelecionadosLabels}
           onChange={(labels) => {
             const codParcs = labels.map((l) => clientesPorLabel.get(l)).filter((v): v is number => v != null);

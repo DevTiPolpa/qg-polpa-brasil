@@ -12,12 +12,15 @@ import {
   getHistoricoClientesPorEstado,
   getHistoricoClientesPorSegmento,
   getHistoricoClienteProdutos,
+  getHistoricoClienteProdutoMensal,
   type HistoricoClientesFiltros,
+  type HistoricoClienteProdutoItem,
 } from '../lib/api'
 import {
   DollarSign, Percent, Weight, Tag, Package, Users,
   RefreshCw, X, ChevronDown, ChevronRight,
 } from 'lucide-react'
+import { formatMes } from '../lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 const DEFAULT_FILTROS: Filtros = { dataInicio: '2026-01-01', dataFim: '2026-12-31' }
@@ -165,6 +168,84 @@ function DonutPanel({ title, data, total, selectedName, onSliceClick }: {
   )
 }
 
+// ─── Produto Row (expansível com lazy load do detalhamento mensal) ───────────
+function ProdutoRow({ p, codParc, baseFiltros, isSelected, isDimmed, onProductClick }: {
+  p: HistoricoClienteProdutoItem; codParc: number; baseFiltros: HistoricoClientesFiltros
+  isSelected: boolean; isDimmed: boolean
+  onProductClick?: (code: string, name: string) => void
+}) {
+  const [mensalExpanded, setMensalExpanded] = useState(false)
+
+  const { data: mensal, isLoading: mensalLoading } = useQuery({
+    queryKey: ['historico-clientes', 'produto-mensal', codParc, p.codProduto, baseFiltros],
+    queryFn: () => getHistoricoClienteProdutoMensal(codParc, p.codProduto, baseFiltros),
+    enabled: mensalExpanded,
+    staleTime: 60_000,
+  })
+
+  return (
+    <>
+      <tr
+        onClick={() => onProductClick?.(p.codProduto, p.nomeProduto)}
+        className={`border-b border-slate-800/40 cursor-pointer select-none transition-all ${
+          isSelected ? 'bg-violet-900/40' : 'hover:bg-slate-800/30'
+        } ${isDimmed ? 'opacity-30' : ''}`}
+      >
+        <td className="py-1.5 pr-2">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setMensalExpanded(v => !v) }}
+            className="text-slate-500 hover:text-white transition-colors"
+            title="Ver detalhamento mensal"
+          >
+            <ChevronRight className={`w-3 h-3 transition-transform ${mensalExpanded ? 'rotate-90' : ''}`} />
+          </button>
+        </td>
+        <td className={`py-1.5 pr-4 ${isSelected ? 'text-violet-300' : 'text-slate-400'}`}>{p.codProduto}</td>
+        <td className={`py-1.5 pr-4 font-medium max-w-[220px] truncate ${isSelected ? 'text-violet-200' : 'text-white'}`}>{p.nomeProduto}</td>
+        <td className="py-1.5 pr-4 text-right text-slate-300 whitespace-nowrap">{fmtTableNum(p.volume)}</td>
+        <td className="py-1.5 pr-4 text-right text-slate-300 whitespace-nowrap">{fmtTableNum(p.valor)}</td>
+        <td className="py-1.5 pr-4 text-right text-slate-300">R$ {fmtNum(p.precoMedio, 2)}</td>
+        <td className="py-1.5 text-right text-slate-400">
+          {p.dtUltimaCompra ? new Date(p.dtUltimaCompra).toLocaleDateString('pt-BR') : '—'}
+        </td>
+      </tr>
+      {mensalExpanded && (
+        <tr>
+          <td colSpan={7} className="p-0">
+            <div className="bg-slate-950/40 border-b border-slate-800/60 pl-10 pr-4 py-2">
+              {mensalLoading ? (
+                <p className="text-slate-500 text-[11px] py-1">Carregando...</p>
+              ) : !mensal?.length ? (
+                <p className="text-slate-500 text-[11px] py-1">Nenhum dado mensal encontrado.</p>
+              ) : (
+                <table className="w-full text-[11px]">
+                  <thead>
+                    <tr className="border-b border-slate-800/60">
+                      <th className="text-left pb-1 pr-4 font-medium text-slate-500">Mês</th>
+                      <th className="text-right pb-1 pr-4 font-medium text-slate-500">Quantidade (KG)</th>
+                      <th className="text-right pb-1 font-medium text-slate-500">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mensal.map(m => (
+                      <tr key={m.mes} className="border-b border-slate-800/30">
+                        <td className="py-1 pr-4 text-slate-300">{formatMes(m.mes)}</td>
+                        <td className="py-1 pr-4 text-right text-slate-300">{fmtTableNum(m.quantidade)}</td>
+                        <td className="py-1 text-right text-slate-300">{fmtTableNum(m.valor)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
 // ─── Cliente Row (expansível com lazy load de produtos) ───────────────────────
 type ClienteItem = {
   codParc: number; razaoSocial: string
@@ -238,6 +319,7 @@ function ClienteRow({ c, rank, baseFiltros, isExpanded, onToggle, dimmed, select
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-slate-700/60">
+                      <th className="text-left pb-1.5 pr-2 font-medium text-slate-500 w-4"></th>
                       <th className="text-left pb-1.5 pr-4 font-medium text-slate-500 w-20">Código</th>
                       <th className="text-left pb-1.5 pr-4 font-medium text-slate-500">Produto</th>
                       <th className="text-right pb-1.5 pr-4 font-medium text-slate-500">Volume (KG)</th>
@@ -247,28 +329,17 @@ function ClienteRow({ c, rank, baseFiltros, isExpanded, onToggle, dimmed, select
                     </tr>
                   </thead>
                   <tbody>
-                    {produtos.map(p => {
-                      const isSelected = selectedProductCode === p.codProduto
-                      const isDimmed = !!selectedProductCode && !isSelected
-                      return (
-                        <tr
-                          key={p.codProduto}
-                          onClick={() => onProductClick?.(p.codProduto, p.nomeProduto)}
-                          className={`border-b border-slate-800/40 cursor-pointer select-none transition-all ${
-                            isSelected ? 'bg-violet-900/40' : 'hover:bg-slate-800/30'
-                          } ${isDimmed ? 'opacity-30' : ''}`}
-                        >
-                          <td className={`py-1.5 pr-4 ${isSelected ? 'text-violet-300' : 'text-slate-400'}`}>{p.codProduto}</td>
-                          <td className={`py-1.5 pr-4 font-medium max-w-[220px] truncate ${isSelected ? 'text-violet-200' : 'text-white'}`}>{p.nomeProduto}</td>
-                          <td className="py-1.5 pr-4 text-right text-slate-300 whitespace-nowrap">{fmtTableNum(p.volume)}</td>
-                          <td className="py-1.5 pr-4 text-right text-slate-300 whitespace-nowrap">{fmtTableNum(p.valor)}</td>
-                          <td className="py-1.5 pr-4 text-right text-slate-300">R$ {fmtNum(p.precoMedio, 2)}</td>
-                          <td className="py-1.5 text-right text-slate-400">
-                            {p.dtUltimaCompra ? new Date(p.dtUltimaCompra).toLocaleDateString('pt-BR') : '—'}
-                          </td>
-                        </tr>
-                      )
-                    })}
+                    {produtos.map(p => (
+                      <ProdutoRow
+                        key={p.codProduto}
+                        p={p}
+                        codParc={c.codParc}
+                        baseFiltros={baseFiltros}
+                        isSelected={selectedProductCode === p.codProduto}
+                        isDimmed={!!selectedProductCode && selectedProductCode !== p.codProduto}
+                        onProductClick={onProductClick}
+                      />
+                    ))}
                   </tbody>
                 </table>
               )}
@@ -289,6 +360,7 @@ function toBackend(f: Filtros): HistoricoClientesFiltros {
     mercados: f.mercados?.length ? f.mercados : undefined,
     gruposProduto: f.gruposProduto?.length ? f.gruposProduto : undefined,
     vendedores: f.vendedores?.length ? f.vendedores : undefined,
+    codProdutos: f.codProdutos?.length ? f.codProdutos.map(String) : undefined,
   }
 }
 
@@ -324,33 +396,30 @@ export default function HistoricoClientes() {
 
   const productCode = productCrossFilter?.code ?? null
 
-  // Queries para donuts: produto > cliente expandido > base
-  const donutBackend = useMemo(() => {
-    const base = toBackend(filtros)
-    if (productCode) return { ...base, codProdutos: [productCode] }
-    if (expandedParc) return { ...base, codParcs: [expandedParc] }
-    return base
+  // Filtro combinado: cliente selecionado (expandido) + produto selecionado dentro dele.
+  // Afeta KPIs, gráficos de evolução e donuts — toda a tela passa a refletir somente
+  // o contexto do cliente (e, se houver, do produto) selecionado.
+  const clienteProdutoScopedBackend = useMemo(() => {
+    let f = toBackend(filtros)
+    if (expandedParc) f = { ...f, codParcs: [expandedParc] }
+    if (productCode) f = { ...f, codProdutos: [productCode] }
+    return f
   }, [filtros, expandedParc, productCode])
 
-  // Query para clientes: produto > cross-filter donut > base
+  const donutBackend = clienteProdutoScopedBackend
+
+  // Query para clientes: cross-filter donut (uf/segmento) > base.
+  // Não aplicamos o cliente/produto selecionado aqui para manter a tabela navegável
+  // (a linha do cliente selecionado é destacada visualmente em vez de ser filtrada).
   const clientesBackend = useMemo(() => {
     const base = toBackend(filtros)
-    if (productCode) return { ...base, codProdutos: [productCode] }
     if (crossFilter?.type === 'uf') return { ...base, ufs: [crossFilter.value] }
     if (crossFilter?.type === 'segmento') return { ...base, gruposProduto: [...(base.gruposProduto ?? []), crossFilter.value] }
     return base
-  }, [filtros, crossFilter, productCode])
+  }, [filtros, crossFilter])
 
-  // Backends para kpis e evolução que também filtram por produto
-  const kpisBackend = useMemo(() => {
-    const base = toBackend(filtros)
-    return productCode ? { ...base, codProdutos: [productCode] } : base
-  }, [filtros, productCode])
-
-  const evolucaoBackend = useMemo(() => {
-    const base = toBackend(filtros)
-    return productCode ? { ...base, codProdutos: [productCode] } : base
-  }, [filtros, productCode])
+  const kpisBackend = clienteProdutoScopedBackend
+  const evolucaoBackend = clienteProdutoScopedBackend
 
   const kpisQueryInput = useMemo(() => withMonth(kpisBackend, monthCrossFilter), [kpisBackend, monthCrossFilter])
   const clientesQueryInput = useMemo(() => withMonth(clientesBackend, monthCrossFilter), [clientesBackend, monthCrossFilter])
@@ -386,6 +455,11 @@ export default function HistoricoClientes() {
     queryFn: () => getHistoricoClientesPorSegmento(donutQueryInput),
     ...queryOpts,
   })
+
+  const clienteSelecionado = useMemo(
+    () => (clientes ?? []).find(c => c.codParc === expandedParc) ?? null,
+    [clientes, expandedParc]
+  )
 
   function toggleCliente(codParc: number) {
     setExpandedParc(p => {
@@ -592,20 +666,24 @@ export default function HistoricoClientes() {
       </div>
 
       {/* Banners de cross-filter ativo */}
-      {(monthCrossFilter !== null || productCrossFilter !== null) && (
+      {(expandedParc !== null || monthCrossFilter !== null || productCrossFilter !== null) && (
         <div className="flex flex-wrap gap-2">
-          {monthCrossFilter !== null && (
-            <div className="flex-1 text-[11px] bg-amber-900/40 text-amber-400 border border-amber-700/50 px-3 py-2 rounded-lg flex items-center gap-2">
-              <span>Mês: <strong>{MESES_FULL[monthCrossFilter - 1]}</strong> — filtrando todos os painéis</span>
-              <button onClick={() => setMonthCrossFilter(null)} className="ml-auto flex items-center gap-1 hover:text-white">
+          {expandedParc !== null && (
+            <div className="flex-1 text-[11px] bg-green-900/40 text-green-400 border border-green-700/50 px-3 py-2 rounded-lg flex items-center gap-2">
+              <span>
+                Cliente: <strong>{clienteSelecionado?.razaoSocial ?? `#${expandedParc}`}</strong>
+                {productCrossFilter !== null && <> · Produto: <strong>{productCrossFilter.name}</strong></>}
+                {' '}— KPIs, evolução e donuts mostrando apenas este contexto
+              </span>
+              <button onClick={() => toggleCliente(expandedParc)} className="ml-auto flex items-center gap-1 hover:text-white">
                 <X className="w-3 h-3" /> Limpar
               </button>
             </div>
           )}
-          {productCrossFilter !== null && (
-            <div className="flex-1 text-[11px] bg-violet-900/40 text-violet-400 border border-violet-700/50 px-3 py-2 rounded-lg flex items-center gap-2">
-              <span>Produto: <strong>{productCrossFilter.name}</strong> — filtrando todos os painéis</span>
-              <button onClick={() => setProductCrossFilter(null)} className="ml-auto flex items-center gap-1 hover:text-white">
+          {monthCrossFilter !== null && (
+            <div className="flex-1 text-[11px] bg-amber-900/40 text-amber-400 border border-amber-700/50 px-3 py-2 rounded-lg flex items-center gap-2">
+              <span>Mês: <strong>{MESES_FULL[monthCrossFilter - 1]}</strong> — filtrando todos os painéis</span>
+              <button onClick={() => setMonthCrossFilter(null)} className="ml-auto flex items-center gap-1 hover:text-white">
                 <X className="w-3 h-3" /> Limpar
               </button>
             </div>
@@ -620,8 +698,8 @@ export default function HistoricoClientes() {
           <span className="text-xs text-slate-500">{clientes?.length ?? 0} clientes</span>
           {expandedParc && (
             <span className="ml-auto text-[11px] bg-green-900/40 text-green-400 border border-green-700/50 px-2 py-0.5 rounded-full flex items-center gap-1">
-              Donuts → cliente expandido
-              <button onClick={() => setExpandedParc(null)} className="hover:text-white"><X className="w-3 h-3" /></button>
+              Tela filtrada por este cliente
+              <button onClick={() => toggleCliente(expandedParc)} className="hover:text-white"><X className="w-3 h-3" /></button>
             </span>
           )}
           {crossFilter && (
