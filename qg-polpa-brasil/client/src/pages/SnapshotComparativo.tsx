@@ -182,7 +182,11 @@ export default function SnapshotComparativo() {
     if (apenasComVariacao) {
       lista = lista.filter(r => Math.abs(deltaVsSemanaAnterior(r.currValor, dates, r.snapshots)) > 50)
     }
-    lista = [...lista].sort((a, b) => ordemDesc ? b.currValor - a.currValor : a.currValor - b.currValor)
+    lista = [...lista].sort((a, b) => {
+      const deltaA = deltaVsSemanaAnterior(a.currValor, dates, a.snapshots)
+      const deltaB = deltaVsSemanaAnterior(b.currValor, dates, b.snapshots)
+      return ordemDesc ? deltaB - deltaA : deltaA - deltaB
+    })
     return lista
   }, [rows, dates, apenasComVariacao, ordemDesc])
 
