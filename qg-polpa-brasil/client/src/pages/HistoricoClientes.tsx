@@ -352,7 +352,9 @@ function ClienteRow({ c, rank, baseFiltros, isExpanded, onToggle, dimmed, select
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-function toBackend(f: Filtros): HistoricoClientesFiltros {
+const PROJETOS_LIST = ['NOVOS PROJETOS', 'RECORRENTES', 'TESTE INDUSTRIAL']
+
+function toBackend(f: Filtros, projetos?: string[]): HistoricoClientesFiltros {
   return {
     dataInicio: f.dataInicio,
     dataFim: f.dataFim,
@@ -361,6 +363,7 @@ function toBackend(f: Filtros): HistoricoClientesFiltros {
     gruposProduto: f.gruposProduto?.length ? f.gruposProduto : undefined,
     vendedores: f.vendedores?.length ? f.vendedores : undefined,
     codProdutos: f.codProdutos?.length ? f.codProdutos.map(String) : undefined,
+    projetos: projetos?.length ? projetos : undefined,
   }
 }
 
@@ -372,6 +375,7 @@ function withMonth(b: HistoricoClientesFiltros, mes: number | null): HistoricoCl
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function HistoricoClientes() {
   const [filtros, setFiltros] = useState<Filtros>(DEFAULT_FILTROS)
+  const [projetosAtivos, setProjetosAtivos] = useState<string[]>([])
   const [updatedAt, setUpdatedAt] = useState(() => new Date())
 
   // cross-filter: donut slice selection (filtra tabela de clientes)
@@ -400,11 +404,11 @@ export default function HistoricoClientes() {
   // Afeta KPIs, gráficos de evolução e donuts — toda a tela passa a refletir somente
   // o contexto do cliente (e, se houver, do produto) selecionado.
   const clienteProdutoScopedBackend = useMemo(() => {
-    let f = toBackend(filtros)
+    let f = toBackend(filtros, projetosAtivos)
     if (expandedParc) f = { ...f, codParcs: [expandedParc] }
     if (productCode) f = { ...f, codProdutos: [productCode] }
     return f
-  }, [filtros, expandedParc, productCode])
+  }, [filtros, projetosAtivos, expandedParc, productCode])
 
   const donutBackend = clienteProdutoScopedBackend
 
@@ -412,11 +416,11 @@ export default function HistoricoClientes() {
   // Não aplicamos o cliente/produto selecionado aqui para manter a tabela navegável
   // (a linha do cliente selecionado é destacada visualmente em vez de ser filtrada).
   const clientesBackend = useMemo(() => {
-    const base = toBackend(filtros)
+    const base = toBackend(filtros, projetosAtivos)
     if (crossFilter?.type === 'uf') return { ...base, ufs: [crossFilter.value] }
     if (crossFilter?.type === 'segmento') return { ...base, gruposProduto: [...(base.gruposProduto ?? []), crossFilter.value] }
     return base
-  }, [filtros, crossFilter])
+  }, [filtros, projetosAtivos, crossFilter])
 
   const kpisBackend = clienteProdutoScopedBackend
   const evolucaoBackend = clienteProdutoScopedBackend
@@ -543,6 +547,35 @@ export default function HistoricoClientes() {
       </div>
 
       <FiltrosGlobais filtros={filtros} onChange={setFiltros} showProjetos={false} showTipoReceita={false} />
+
+      {/* Filtro de Projeto */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-slate-500 font-medium uppercase tracking-wide">Projeto</span>
+        {PROJETOS_LIST.map(p => {
+          const isActive = projetosAtivos.includes(p)
+          return (
+            <button
+              key={p}
+              onClick={() => setProjetosAtivos(prev => isActive ? prev.filter(x => x !== p) : [...prev, p])}
+              className={`px-3 py-1 rounded-md text-xs font-medium border transition-colors ${
+                isActive
+                  ? 'bg-green-600 border-green-500 text-white'
+                  : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-slate-400 hover:text-white'
+              }`}
+            >
+              {p}
+            </button>
+          )
+        })}
+        {projetosAtivos.length > 0 && (
+          <button
+            onClick={() => setProjetosAtivos([])}
+            className="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1 ml-1"
+          >
+            <X className="w-3 h-3" /> Limpar
+          </button>
+        )}
+      </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
@@ -735,7 +768,7 @@ export default function HistoricoClientes() {
                       key={c.codParc}
                       c={c}
                       rank={i + 1}
-                      baseFiltros={toBackend(filtros)}
+                      baseFiltros={toBackend(filtros, projetosAtivos)}
                       isExpanded={expandedParc === c.codParc}
                       onToggle={() => toggleCliente(c.codParc)}
                       dimmed={expandedParc !== null && expandedParc !== c.codParc}

@@ -691,6 +691,7 @@ export type HistoricoClientesFiltros = {
   codProdutos?: string[]
   dataInicio?: string
   dataFim?: string
+  projetos?: string[]
 }
 
 export type HistoricoClientesFiltrosDisponiveis = {
@@ -770,6 +771,7 @@ function buildHistoricoClientesParams(filtros: HistoricoClientesFiltros = {}) {
   appendHistoricoClientesArrayParam(params, 'vendedores', filtros.vendedores)
   appendHistoricoClientesArrayParam(params, 'ufs', filtros.ufs)
   appendHistoricoClientesArrayParam(params, 'codProdutos', filtros.codProdutos)
+  appendHistoricoClientesArrayParam(params, 'projetos', filtros.projetos)
   if (filtros.dataInicio) params.set('dataInicio', filtros.dataInicio)
   if (filtros.dataFim) params.set('dataFim', filtros.dataFim)
   const query = params.toString()
