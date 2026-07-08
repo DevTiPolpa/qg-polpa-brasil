@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { getVendedoresOriginalResumo, getVendedoresOriginalClienteMix, getVendedoresOriginalClienteProdutoMensal, type VendedoresOriginalResumo } from '../lib/api'
+import {
+  getVendedoresOriginalResumo, getVendedoresOriginalClienteMix, getVendedoresOriginalClienteProdutoMensal,
+  getVendedoresOriginalCrmMapping, getVendedoresOriginalCrmKpis, getDashboardOriginalFiltrosDisponiveis,
+  type VendedoresOriginalResumo,
+} from '../lib/api'
 import FiltrosGlobais, { type Filtros } from '../components/FiltrosGlobais'
 import { formatCurrency, formatNumber, formatKg, formatMes } from '../lib/utils'
 import { TAILWIND, BORDER_L_COLOR } from '../lib/colors'
@@ -206,21 +210,24 @@ function ProdutoRow({ codParc, p, filtros }: { codParc: number; p: any; filtros:
         <td className="px-2 py-1.5" />
         <td className="px-2 py-1.5 text-green-500/80 text-[11px] text-right">{formatCurrency(Number(p.faturamento))}</td>
         <td className="px-2 py-1.5 text-slate-500 text-[11px] text-right">{Math.round(Number(p.volume)).toLocaleString('pt-BR')}</td>
+        <td className="px-2 py-1.5 text-slate-500 text-[11px] text-right whitespace-nowrap">
+          {p.ultimaCompra ? new Date(p.ultimaCompra).toLocaleDateString('pt-BR') : '—'}
+        </td>
         <td className="px-2 py-1.5" />
       </tr>
       {expanded && loadingMensal && (
         <tr className="bg-slate-950/60 border-l-2 border-l-slate-700">
-          <td colSpan={5} className="pl-12 pr-2 py-1.5 text-slate-500 text-[11px]">Carregando detalhamento mensal...</td>
+          <td colSpan={6} className="pl-12 pr-2 py-1.5 text-slate-500 text-[11px]">Carregando detalhamento mensal...</td>
         </tr>
       )}
       {expanded && mensalError && (
         <tr className="bg-slate-950/60 border-l-2 border-l-red-700">
-          <td colSpan={5} className="pl-12 pr-2 py-1.5 text-red-400 text-[11px]">Não foi possível carregar o detalhamento mensal.</td>
+          <td colSpan={6} className="pl-12 pr-2 py-1.5 text-red-400 text-[11px]">Não foi possível carregar o detalhamento mensal.</td>
         </tr>
       )}
       {expanded && !loadingMensal && !mensalError && (mensal ?? []).length === 0 && (
         <tr className="bg-slate-950/60 border-l-2 border-l-slate-700">
-          <td colSpan={5} className="pl-12 pr-2 py-1.5 text-slate-500 text-[11px]">Nenhum registro mensal encontrado.</td>
+          <td colSpan={6} className="pl-12 pr-2 py-1.5 text-slate-500 text-[11px]">Nenhum registro mensal encontrado.</td>
         </tr>
       )}
       {expanded && !loadingMensal && !mensalError && (mensal ?? []).map((m: any) => (
@@ -229,6 +236,7 @@ function ProdutoRow({ codParc, p, filtros }: { codParc: number; p: any; filtros:
           <td className="px-2 py-1" />
           <td className="px-2 py-1 text-green-500/70 text-[11px] text-right">{formatCurrency(Number(m.valor))}</td>
           <td className="px-2 py-1 text-slate-500 text-[11px] text-right">{Math.round(Number(m.quantidade)).toLocaleString('pt-BR')}</td>
+          <td className="px-2 py-1" />
           <td className="px-2 py-1" />
         </tr>
       ))}
@@ -274,6 +282,9 @@ function ClienteRow({ c, filtros }: { c: any; filtros: Filtros }) {
         <td className="px-2 py-2 text-slate-400 text-center">{c.uf ?? '—'}</td>
         <td className="px-2 py-2 text-green-400 font-semibold text-right">{formatCurrency(Number(c.faturamento))}</td>
         <td className="px-2 py-2 text-slate-400 text-right">{Math.round(Number(c.volume)).toLocaleString('pt-BR')}</td>
+        <td className="px-2 py-2 text-slate-400 text-right whitespace-nowrap">
+          {c.ultimaCompra ? new Date(c.ultimaCompra).toLocaleDateString('pt-BR') : '—'}
+        </td>
         <td className="px-2 py-2 text-right">
           <button className="text-slate-500 hover:text-slate-300 transition-colors text-[10px] flex items-center gap-0.5 ml-auto">
             <ExternalLink className="w-3 h-3" />
@@ -282,12 +293,12 @@ function ClienteRow({ c, filtros }: { c: any; filtros: Filtros }) {
       </tr>
       {expanded && loadingMix && (
         <tr className="bg-slate-900/60 border-l-2 border-l-slate-600">
-          <td colSpan={5} className="pl-7 pr-2 py-2 text-slate-500 text-[11px]">Carregando produtos...</td>
+          <td colSpan={6} className="pl-7 pr-2 py-2 text-slate-500 text-[11px]">Carregando produtos...</td>
         </tr>
       )}
       {expanded && mixError && (
         <tr className="bg-slate-900/60 border-l-2 border-l-red-700">
-          <td colSpan={5} className="pl-7 pr-2 py-2 text-red-400 text-[11px]">Não foi possível carregar os produtos deste cliente.</td>
+          <td colSpan={6} className="pl-7 pr-2 py-2 text-red-400 text-[11px]">Não foi possível carregar os produtos deste cliente.</td>
         </tr>
       )}
       {expanded && !loadingMix && !mixError && (mix ?? []).map((p: any) => (
@@ -328,6 +339,7 @@ export default function Vendedores() {
     getVendedoresOriginalResumo({
       dataInicio: filtrosApi.dataInicio,
       dataFim: filtrosApi.dataFim,
+      periodos: filtrosApi.periodos,
       mercados: filtrosApi.mercados,
       vendedores: filtrosApi.vendedores,
       projetos: filtrosApi.projetos,
@@ -344,6 +356,7 @@ export default function Vendedores() {
   }, [
     filtrosApi.dataInicio,
     filtrosApi.dataFim,
+    JSON.stringify(filtrosApi.periodos ?? []),
     JSON.stringify(filtrosApi.mercados ?? []),
     JSON.stringify(filtrosApi.vendedores ?? []),
     JSON.stringify(filtrosApi.projetos ?? []),
@@ -353,12 +366,30 @@ export default function Vendedores() {
     JSON.stringify(filtrosApi.codProdutos ?? []),
   ])
 
+  // CRM (Em Andamento / Vlr Andamento): sempre o estado atual do Panorama CRM,
+  // buscado à parte e nunca refeito por causa dos filtros desta tela.
+  const { data: crmMapping = [] } = useQuery({
+    queryKey: ['vendedores-original-crm-mapping'],
+    queryFn: getVendedoresOriginalCrmMapping,
+    staleTime: 5 * 60_000,
+  })
+  const { data: crmKpis = [] } = useQuery({
+    queryKey: ['vendedores-original-crm-kpis'],
+    queryFn: getVendedoresOriginalCrmKpis,
+    staleTime: 60_000,
+  })
+  // Lista completa (não filtrada) de vendedores, usada só para casar o nome do CRM com o
+  // "nomeVendedor" canônico — não pode vir de `lista`, que já está filtrada pela tela.
+  const { data: disponiveis } = useQuery({
+    queryKey: ['dashboard-original-filtros-disponiveis'],
+    queryFn: getDashboardOriginalFiltrosDisponiveis,
+    staleTime: 5 * 60_000,
+  })
+
   const metasRaw = resumo?.metas ?? []
   const lista = resumo?.vendedores ?? []
   const evolucaoConsolidada = resumo?.evolucaoMensal ?? []
   const evolucaoPorTipo = resumo?.evolucaoPorTipo ?? []
-  const crmMapping = resumo?.crmMapping ?? []
-  const crmKpis = resumo?.crmKpis ?? []
   const orcamentoMensal = resumo?.orcamentoMensal ?? []
   const clientesConsolidados = resumo?.clientesConsolidados ?? []
   const evolucaoVendedor = resumo?.evolucaoMensal ?? []
@@ -417,10 +448,12 @@ export default function Vendedores() {
     return [...(lista ?? []), ...extras]
   }, [lista, metasPorVendedor])
 
-  // Lookup: nomeVendedor → KPIs CRM
+  // Lookup: nomeVendedor → KPIs CRM. Casado contra a lista completa (não filtrada) de
+  // vendedores, para que EM AND./VLR AND. nunca dependam dos filtros desta tela.
   const crmKpiByVendedor = useMemo(() => {
     const mappingArr = crmMapping ?? []
     const kpisArr    = crmKpis    ?? []
+    const todosVendedores = disponiveis?.vendedores ?? []
     const map: Record<string, typeof kpisArr[0]> = {}
     const normalizarNome = (nome: string) => nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim()
     for (const m of mappingArr) {
@@ -430,12 +463,12 @@ export default function Vendedores() {
       const nome = m.nomeFaturamento ?? m.nome
       if (kpi && nome) {
         const nomeNormalizado = normalizarNome(nome)
-        const vendedor = (lista ?? []).find(v => normalizarNome(v.nomeVendedor ?? '').includes(nomeNormalizado) || nomeNormalizado.includes(normalizarNome(v.nomeVendedor ?? '')))
-        map[vendedor?.nomeVendedor ?? nome] = kpi
+        const nomeVendedor = todosVendedores.find(v => normalizarNome(v).includes(nomeNormalizado) || nomeNormalizado.includes(normalizarNome(v)))
+        map[nomeVendedor ?? nome] = kpi
       }
     }
     return map
-  }, [crmMapping, crmKpis, lista])
+  }, [crmMapping, crmKpis, disponiveis])
 
   // Sparklines — séries mensais por tipo para os KPI cards
   const sparklines = useMemo(() => {
@@ -784,10 +817,11 @@ export default function Vendedores() {
           <div className="overflow-y-auto max-h-[480px]">
             <table className="w-full table-fixed text-xs">
               <colgroup>
-                <col className="w-[42%]" />
+                <col className="w-[34%]" />
                 <col className="w-[8%]" />
-                <col className="w-[24%]" />
-                <col className="w-[18%]" />
+                <col className="w-[20%]" />
+                <col className="w-[14%]" />
+                <col className="w-[16%]" />
                 <col className="w-[8%]" />
               </colgroup>
               <thead className="sticky top-0 z-10 bg-slate-800">
@@ -796,6 +830,7 @@ export default function Vendedores() {
                   <th className="text-left px-2 py-2 font-medium">UF</th>
                   <th className="text-right px-2 py-2 font-medium">Faturamento</th>
                   <th className="text-right px-2 py-2 font-medium">Volume</th>
+                  <th className="text-right px-2 py-2 font-medium">Última Compra</th>
                   <th className="text-right px-2 py-2 font-medium">Ação</th>
                 </tr>
               </thead>

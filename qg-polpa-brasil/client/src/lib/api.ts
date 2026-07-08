@@ -191,6 +191,7 @@ export async function deleteMeta2026(id: number): Promise<ApiMessageResponse> {
 export type VendedoresOriginalFiltros = {
   dataInicio?: string
   dataFim?: string
+  periodos?: string[]
   mercados?: string[]
   vendedores?: string[]
   projetos?: string[]
@@ -342,6 +343,7 @@ export async function getVendedoresOriginalResumo(filtros: VendedoresOriginalFil
   params.set('dataInicio', filtros.dataInicio || '2026-01-01')
   params.set('dataFim', filtros.dataFim || '2026-12-31')
   params.set('limitClientes', String(filtros.limitClientes ?? 50))
+  appendArrayParam(params, 'periodos', filtros.periodos)
   appendArrayParam(params, 'mercados', filtros.mercados)
   appendArrayParam(params, 'vendedores', filtros.vendedores)
   appendArrayParam(params, 'projetos', filtros.projetos)
@@ -359,6 +361,7 @@ export async function getVendedoresOriginalClienteMix(codParc: number, filtros: 
   const params = new URLSearchParams()
   params.set('dataInicio', filtros.dataInicio || '2026-01-01')
   params.set('dataFim', filtros.dataFim || '2026-12-31')
+  appendArrayParam(params, 'periodos', filtros.periodos)
   appendArrayParam(params, 'mercados', filtros.mercados)
   appendArrayParam(params, 'vendedores', filtros.vendedores)
   appendArrayParam(params, 'projetos', filtros.projetos)
@@ -373,6 +376,7 @@ export async function getVendedoresOriginalClienteProdutoMensal(codParc: number,
   const params = new URLSearchParams()
   params.set('dataInicio', filtros.dataInicio || '2026-01-01')
   params.set('dataFim', filtros.dataFim || '2026-12-31')
+  appendArrayParam(params, 'periodos', filtros.periodos)
   appendArrayParam(params, 'mercados', filtros.mercados)
   appendArrayParam(params, 'vendedores', filtros.vendedores)
   appendArrayParam(params, 'projetos', filtros.projetos)
@@ -382,11 +386,22 @@ export async function getVendedoresOriginalClienteProdutoMensal(codParc: number,
   return apiRequest<VendedoresOriginalClienteProdutoMensal[]>(`/api/vendedores-original/clientes/${codParc}/produtos/${codProduto}/mensal?${params.toString()}`)
 }
 
+// Dados de CRM (Em Andamento / Vlr Andamento) — sempre o estado atual do Panorama CRM,
+// sem nenhum filtro de período/cliente/produto/vendedor desta tela.
+export async function getVendedoresOriginalCrmMapping(): Promise<VendedoresOriginalCrmMapping[]> {
+  return apiRequest<VendedoresOriginalCrmMapping[]>('/api/vendedores-original/crm-mapping')
+}
+
+export async function getVendedoresOriginalCrmKpis(): Promise<VendedoresOriginalCrmKpis[]> {
+  return apiRequest<VendedoresOriginalCrmKpis[]>('/api/vendedores-original/crm-kpis')
+}
+
 
 
 export type DashboardOriginalFiltros = {
   dataInicio?: string
   dataFim?: string
+  periodos?: string[]
   mercados?: string[]
   vendedores?: string[]
   projetos?: string[]
@@ -524,6 +539,7 @@ export type DashboardOriginalResumo = {
 function appendDashboardFiltros(params: URLSearchParams, filtros: DashboardOriginalFiltros = {}) {
   params.set('dataInicio', filtros.dataInicio || '2026-01-01')
   params.set('dataFim', filtros.dataFim || '2026-12-31')
+  appendArrayParam(params, 'periodos', filtros.periodos)
   appendArrayParam(params, 'mercados', filtros.mercados ?? (filtros.mercado ? [filtros.mercado] : undefined))
   appendArrayParam(params, 'vendedores', filtros.vendedores ?? (filtros.vendedor ? [filtros.vendedor] : undefined))
   appendArrayParam(params, 'projetos', filtros.projetos ?? (filtros.projeto ? [filtros.projeto] : undefined))
@@ -568,6 +584,7 @@ export async function getDashboardOriginalFiltrosDisponiveis(): Promise<Dashboar
 export type NovosProjetosFiltros = {
   dataInicio?: string
   dataFim?: string
+  periodos?: string[]
   mercados?: string[]
   vendedores?: string[]
   projetos?: string[]
@@ -628,6 +645,7 @@ function buildNovosProjetosParams(filtros: NovosProjetosFiltros = {}, extra?: Re
   if (filtros.codProduto) params.set('codProduto', String(filtros.codProduto))
   if (filtros.modoCard) params.set('modoCard', filtros.modoCard)
 
+  appendNovosProjetosArrayParam(params, 'periodos', filtros.periodos)
   appendNovosProjetosArrayParam(params, 'mercados', filtros.mercados)
   appendNovosProjetosArrayParam(params, 'vendedores', filtros.vendedores)
   appendNovosProjetosArrayParam(params, 'projetos', filtros.projetos)
@@ -692,6 +710,7 @@ export type HistoricoClientesFiltros = {
   dataInicio?: string
   dataFim?: string
   projetos?: string[]
+  periodos?: string[]
 }
 
 export type HistoricoClientesFiltrosDisponiveis = {
@@ -721,6 +740,7 @@ export type HistoricoClienteItem = {
   qtdProdutos: number
   pctValor: number
   pctVolume: number
+  ultimaCompra: string | null
 }
 
 export type HistoricoClientesEvolucaoItem = {
@@ -772,6 +792,7 @@ function buildHistoricoClientesParams(filtros: HistoricoClientesFiltros = {}) {
   appendHistoricoClientesArrayParam(params, 'ufs', filtros.ufs)
   appendHistoricoClientesArrayParam(params, 'codProdutos', filtros.codProdutos)
   appendHistoricoClientesArrayParam(params, 'projetos', filtros.projetos)
+  appendHistoricoClientesArrayParam(params, 'periodos', filtros.periodos)
   if (filtros.dataInicio) params.set('dataInicio', filtros.dataInicio)
   if (filtros.dataFim) params.set('dataFim', filtros.dataFim)
   const query = params.toString()
@@ -825,6 +846,7 @@ export async function getHistoricoClienteProdutoMensal(codParc: number, codProdu
 export type SnapshotFiltros = {
   dataInicio?: string
   dataFim?: string
+  periodos?: string[]
   mercados?: string[]
   vendedores?: string[]
   projetos?: string[]
@@ -880,6 +902,7 @@ function buildSnapshotParams(filtros: SnapshotFiltros = {}) {
   if (filtros.dataFim) params.set('dataFim', filtros.dataFim)
   if (filtros.uf) params.set('uf', filtros.uf)
   if (filtros.codParc != null) params.set('codParc', String(filtros.codParc))
+  appendArrayParam(params, 'periodos', filtros.periodos)
   appendArrayParam(params, 'mercados', filtros.mercados)
   appendArrayParam(params, 'vendedores', filtros.vendedores)
   appendArrayParam(params, 'projetos', filtros.projetos)
@@ -915,6 +938,7 @@ export async function criarSnapshotManual(): Promise<SnapshotCriarResponse> {
 export type RecorrentesFiltros = {
   dataInicio?: string
   dataFim?: string
+  periodos?: string[]
   mercados?: string[]
   vendedores?: string[]
   codParc?: number | null
@@ -957,6 +981,7 @@ function buildRecorrentesParams(filtros: RecorrentesFiltros = {}) {
   const params = new URLSearchParams()
   params.set('dataInicio', filtros.dataInicio || '2026-01-01')
   params.set('dataFim', filtros.dataFim || '2026-12-31')
+  appendArrayParam(params, 'periodos', filtros.periodos)
   appendArrayParam(params, 'mercados', filtros.mercados)
   appendArrayParam(params, 'vendedores', filtros.vendedores)
   if (filtros.codParc != null) params.set('codParc', String(filtros.codParc))

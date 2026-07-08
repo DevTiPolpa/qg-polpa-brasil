@@ -6,8 +6,6 @@ import path from 'path'
 import { createExpressMiddleware } from '@trpc/server/adapters/express'
 import { appRouter } from './routers'
 import { createContext } from './trpc'
-import { createForecastSnapshot, getSnapshotDates } from './db'
-
 const app = express()
 const PORT = process.env.PORT ?? 5000
 
@@ -32,24 +30,3 @@ app.get('*', (_req, res) => {
 app.listen(PORT, () => {
   console.log(`[QG Polpa Brasil] Servidor rodando em http://localhost:${PORT}`)
 })
-
-// ─── Cron: snapshot toda sexta-feira às 17:00 ────────────────────────────────
-let _lastSnapshotCheck = ''
-setInterval(async () => {
-  const now = new Date()
-  if (now.getDay() !== 5 || now.getHours() !== 17 || now.getMinutes() !== 0) return
-  const today = now.toISOString().split('T')[0]
-  if (_lastSnapshotCheck === today) return   // já executou hoje
-  _lastSnapshotCheck = today
-  try {
-    const existing = await getSnapshotDates()
-    if (existing.some(d => d.snapshotDate === today)) {
-      console.log('[Snapshot] Já existe snapshot para hoje, pulando.')
-      return
-    }
-    const { inserted } = await createForecastSnapshot()
-    console.log(`[Snapshot] Criado snapshot de ${today} com ${inserted} linhas.`)
-  } catch (err) {
-    console.error('[Snapshot] Erro ao criar snapshot:', err)
-  }
-}, 60_000)

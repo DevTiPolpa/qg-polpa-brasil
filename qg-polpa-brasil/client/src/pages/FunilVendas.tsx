@@ -20,9 +20,10 @@ import {
 import { formatCurrency, formatNumber, formatPercent, formatMes } from '../lib/utils'
 
 // ─── Cores ────────────────────────────────────────────────────────────────────
-const C_ANDAMENTO = 'oklch(0.62 0.18 250)'
-const C_GANHO     = 'oklch(0.65 0.20 145)'
-const C_PERDIDO   = 'oklch(0.65 0.22 25)'
+// Mesmos tons de azul/verde usados no gráfico de Evolução Mensal da tela Histórico Clientes.
+const C_ANDAMENTO = '#4F7CAC'
+const C_GANHO     = '#4F9D6E'
+const C_PERDIDO   = 'oklch(0.58 0.13 25)'
 const C_GRID      = 'oklch(0.22 0.008 265)'
 const C_TICK      = 'oklch(0.52 0.012 265)'
 
@@ -256,7 +257,7 @@ export default function FunilVendas() {
                     <XAxis type="number" tick={{ fontSize: 11, fill: C_TICK }} axisLine={false} tickLine={false} />
                     <YAxis
                       type="category" dataKey="etapa" width={180}
-                      tick={{ fontSize: 10, fill: C_TICK }} axisLine={false} tickLine={false}
+                      tick={{ fontSize: 10, fill: '#ffffff' }} axisLine={false} tickLine={false}
                     />
                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'oklch(0.22 0.008 265 / 0.4)' }} />
                     <Bar dataKey="Negócios" fill={C_ANDAMENTO} radius={[0, 3, 3, 0]} maxBarSize={20} />

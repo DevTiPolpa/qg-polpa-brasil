@@ -116,6 +116,7 @@ export default function RecorrentesRealOrcado() {
   const filtros = useMemo<RecorrentesFiltros>(() => ({
     dataInicio:    filtrosGlobais.dataInicio,
     dataFim:       filtrosGlobais.dataFim,
+    periodos:      filtrosGlobais.periodos?.length ? filtrosGlobais.periodos : undefined,
     mercados:      filtrosGlobais.mercados?.length ? filtrosGlobais.mercados : undefined,
     vendedores:    filtrosGlobais.vendedores?.length ? filtrosGlobais.vendedores : undefined,
     codParcs:      filtrosGlobais.codParcs?.length ? filtrosGlobais.codParcs : undefined,

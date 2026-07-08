@@ -200,7 +200,7 @@ export default function SnapshotComparativo() {
             Comparativo Semanal
           </h1>
           <p className="text-slate-400 text-sm mt-0.5">
-            Evolução da previsão de vendas — uma coluna por semana · dados fixados toda quarta-feira às 08h30
+            Evolução da previsão de vendas — uma coluna por semana · dados fixados toda quarta-feira às 14h30
           </p>
         </div>
 
@@ -228,7 +228,7 @@ export default function SnapshotComparativo() {
           <div className="text-center">
             <p className="text-white font-semibold">Nenhum snapshot disponível</p>
             <p className="text-slate-400 text-sm mt-1">
-              O sistema congela automaticamente toda quarta-feira às 08h30.
+              O sistema congela automaticamente toda quarta-feira às 14h30.
             </p>
           </div>
         </div>

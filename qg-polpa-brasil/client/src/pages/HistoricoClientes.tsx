@@ -251,6 +251,7 @@ type ClienteItem = {
   codParc: number; razaoSocial: string
   valor: number; volume: number; precoMedio: number
   qtdProdutos: number; pctValor: number; pctVolume: number
+  ultimaCompra: string | null
 }
 
 function ClienteRow({ c, rank, baseFiltros, isExpanded, onToggle, dimmed, selectedProductCode, onProductClick }: {
@@ -296,10 +297,13 @@ function ClienteRow({ c, rank, baseFiltros, isExpanded, onToggle, dimmed, select
         <td className="px-2 py-1.5 text-right text-slate-400">{fmtNum(c.pctVolume, 1)}%</td>
         <td className="px-2 py-1.5 text-right text-slate-300">R$ {fmtNum(c.precoMedio, 2)}</td>
         <td className="px-2 py-1.5 text-right text-slate-300">{c.qtdProdutos}</td>
+        <td className="px-2 py-1.5 text-right text-slate-400 whitespace-nowrap">
+          {c.ultimaCompra ? new Date(c.ultimaCompra).toLocaleDateString('pt-BR') : '—'}
+        </td>
       </tr>
       {/* Expansion row — always rendered, altura controlada por CSS */}
       <tr>
-        <td colSpan={8} className="p-0">
+        <td colSpan={9} className="p-0">
           <div
             className={`overflow-hidden transition-all duration-200 ease-in-out ${
               isExpanded ? 'max-h-[600px]' : 'max-h-0'
@@ -358,6 +362,7 @@ function toBackend(f: Filtros, projetos?: string[]): HistoricoClientesFiltros {
   return {
     dataInicio: f.dataInicio,
     dataFim: f.dataFim,
+    periodos: f.periodos?.length ? f.periodos : undefined,
     codParcs: f.codParcs?.length ? f.codParcs : undefined,
     mercados: f.mercados?.length ? f.mercados : undefined,
     gruposProduto: f.gruposProduto?.length ? f.gruposProduto : undefined,
@@ -377,6 +382,7 @@ export default function HistoricoClientes() {
   const [filtros, setFiltros] = useState<Filtros>(DEFAULT_FILTROS)
   const [projetosAtivos, setProjetosAtivos] = useState<string[]>([])
   const [updatedAt, setUpdatedAt] = useState(() => new Date())
+  const [evolucaoView, setEvolucaoView] = useState<'faturamento' | 'volume'>('faturamento')
 
   // cross-filter: donut slice selection (filtra tabela de clientes)
   const [crossFilter, setCrossFilter] = useState<CrossFilter>(null)
@@ -509,6 +515,25 @@ export default function HistoricoClientes() {
     })
   }, [evolucao])
 
+  const evolucaoConfig = useMemo(() => (
+    evolucaoView === 'faturamento'
+      ? {
+          dataKey: 'valor' as const,
+          name: 'Faturamento R$',
+          color: '#4F7CAC',
+          legendLabel: 'Faturamento (R$)',
+          tickFormatter: (v: number) =>
+            v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}Mi` : v >= 1_000 ? `${(v / 1_000).toFixed(0)}k` : String(v),
+        }
+      : {
+          dataKey: 'volume' as const,
+          name: 'Volume kg',
+          color: '#4F9D6E',
+          legendLabel: 'Volume (KG)',
+          tickFormatter: (v: number) => (v >= 1_000 ? `${(v / 1_000).toFixed(0)}k` : String(v)),
+        }
+  ), [evolucaoView])
+
   const estadosDonut = useMemo(() =>
     (estados ?? []).map(r => ({ name: r.uf, valor: r.valor, pct: r.pct })),
     [estados]
@@ -623,78 +648,54 @@ export default function HistoricoClientes() {
         />
       </div>
 
-      {/* Charts Row — KG e Faturamento lado a lado */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Evolução Mensal KG */}
-        <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-700">
-            <p className="text-sm font-semibold text-white">Evolução Mensal (KG)</p>
+      {/* Evolução Mensal — Faturamento / Volume (alterna via seletor) */}
+      <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <p className="text-sm font-semibold text-white">Evolução Mensal</p>
             <div className="flex items-center gap-3 mt-1">
               <span className="flex items-center gap-1 text-[10px] text-slate-400">
-                <span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#4F9D6E' }} /> Volume (KG)
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ background: evolucaoConfig.color }} /> {evolucaoConfig.legendLabel}
               </span>
               <span className="flex items-center gap-1 text-[10px] text-slate-400">
                 <span className="w-4 border-t-2 border-dashed border-white/40" /> Preço Médio (R$)
               </span>
             </div>
           </div>
-          <div className="p-3">
-            <ResponsiveContainer width="100%" height={280}>
-              <ComposedChart data={evolucaoChart} margin={{ top: 4, right: 8, bottom: 0, left: -10 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis yAxisId="vol" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false}
-                  tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} />
-                <YAxis yAxisId="pm" orientation="right" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false}
-                  tickFormatter={v => `R$${v.toFixed(0)}`} />
-                <Tooltip content={<ChartTooltip />} />
-                <Bar yAxisId="vol" dataKey="volume" name="Volume kg" fill="#4F9D6E" radius={[3, 3, 0, 0]}
-                  style={{ cursor: 'pointer' }}
-                  onClick={(_d: unknown, index: number) => handleMonthClick(index + 1)}>
-                  {evolucaoChart.map((_e, i) => (
-                    <Cell key={i} fill="#4F9D6E" opacity={monthCrossFilter === null || monthCrossFilter === i + 1 ? 1 : 0.25} />
-                  ))}
-                </Bar>
-                <Line yAxisId="pm" type="monotone" dataKey="precoMedio" name="Preço Médio R$"
-                  stroke="#ffffff" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
-              </ComposedChart>
-            </ResponsiveContainer>
+          <div className="flex items-center gap-1 bg-slate-900/60 border border-slate-700 rounded-lg p-0.5">
+            {(['faturamento', 'volume'] as const).map(v => (
+              <button
+                key={v}
+                onClick={() => setEvolucaoView(v)}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  evolucaoView === v ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {v === 'faturamento' ? 'Faturamento' : 'Volume'}
+              </button>
+            ))}
           </div>
         </div>
-
-        {/* Evolução Mensal Faturamento */}
-        <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-700">
-            <p className="text-sm font-semibold text-white">Evolução Mensal (Faturamento)</p>
-            <div className="flex items-center gap-3 mt-1">
-              <span className="flex items-center gap-1 text-[10px] text-slate-400">
-                <span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#4F7CAC' }} /> Faturamento (R$)
-              </span>
-              <span className="flex items-center gap-1 text-[10px] text-slate-400">
-                <span className="w-4 border-t-2 border-dashed border-white/40" /> Preço Médio (R$)
-              </span>
-            </div>
-          </div>
-          <div className="p-3">
-            <ResponsiveContainer width="100%" height={280}>
-              <ComposedChart data={evolucaoChart} margin={{ top: 4, right: 8, bottom: 0, left: -10 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis yAxisId="fat" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false}
-                  tickFormatter={v => v >= 1_000_000 ? `${(v/1_000_000).toFixed(1)}Mi` : v >= 1_000 ? `${(v/1_000).toFixed(0)}k` : String(v)} />
-                <YAxis yAxisId="pm" orientation="right" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false}
-                  tickFormatter={v => `R$${v.toFixed(0)}`} />
-                <Tooltip content={<ChartTooltip />} />
-                <Bar yAxisId="fat" dataKey="valor" name="Faturamento R$" fill="#4F7CAC" radius={[3, 3, 0, 0]}
-                  style={{ cursor: 'pointer' }}
-                  onClick={(_d: unknown, index: number) => handleMonthClick(index + 1)}>
-                  {evolucaoChart.map((_e, i) => (
-                    <Cell key={i} fill="#4F7CAC" opacity={monthCrossFilter === null || monthCrossFilter === i + 1 ? 1 : 0.25} />
-                  ))}
-                </Bar>
-                <Line yAxisId="pm" type="monotone" dataKey="precoMedio" name="Preço Médio R$"
-                  stroke="#ffffff" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="p-3">
+          <ResponsiveContainer width="100%" height={280}>
+            <ComposedChart data={evolucaoChart} margin={{ top: 4, right: 8, bottom: 0, left: -10 }}>
+              <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <YAxis yAxisId="main" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false}
+                tickFormatter={evolucaoConfig.tickFormatter} />
+              <YAxis yAxisId="pm" orientation="right" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false}
+                tickFormatter={v => `R$${v.toFixed(0)}`} />
+              <Tooltip content={<ChartTooltip />} />
+              <Bar yAxisId="main" dataKey={evolucaoConfig.dataKey} name={evolucaoConfig.name} fill={evolucaoConfig.color} radius={[3, 3, 0, 0]}
+                style={{ cursor: 'pointer' }}
+                onClick={(_d: unknown, index: number) => handleMonthClick(index + 1)}>
+                {evolucaoChart.map((_e, i) => (
+                  <Cell key={i} fill={evolucaoConfig.color} opacity={monthCrossFilter === null || monthCrossFilter === i + 1 ? 1 : 0.25} />
+                ))}
+              </Bar>
+              <Line yAxisId="pm" type="monotone" dataKey="precoMedio" name="Preço Médio R$"
+                stroke="#ffffff" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
@@ -754,13 +755,14 @@ export default function HistoricoClientes() {
                 <th className="text-right px-2 py-2 font-medium text-slate-400">% Vol</th>
                 <th className="text-right px-2 py-2 font-medium text-slate-400">R$/kg</th>
                 <th className="text-right px-2 py-2 font-medium text-slate-400">Prod</th>
+                <th className="text-right px-2 py-2 font-medium text-slate-400">Última Compra</th>
               </tr>
             </thead>
             <tbody>
               {clientesLoading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i} className="border-b border-slate-700/30 animate-pulse">
-                      <td className="px-3 py-2" colSpan={8}><div className="h-3 bg-slate-700 rounded w-full" /></td>
+                      <td className="px-3 py-2" colSpan={9}><div className="h-3 bg-slate-700 rounded w-full" /></td>
                     </tr>
                   ))
                 : (clientes ?? []).map((c, i) => (
@@ -791,6 +793,7 @@ export default function HistoricoClientes() {
                     R$ {clientesTotal.volume > 0 ? fmtNum(clientesTotal.valor / clientesTotal.volume, 2) : '—'}
                   </td>
                   <td className="px-2 py-2 text-right text-xs text-slate-400">{kpis?.qtdProdutos ?? '—'}</td>
+                  <td className="px-2 py-2" />
                 </tr>
               </tfoot>
             )}

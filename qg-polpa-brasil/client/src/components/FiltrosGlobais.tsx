@@ -11,6 +11,9 @@ export interface Filtros {
   projetos?: string[];
   dataInicio?: string;
   dataFim?: string;
+  /** Períodos específicos no formato "YYYY-MM". Quando presente, tem prioridade sobre
+   * dataInicio/dataFim e permite combinar meses de anos distintos (ex.: Jan/2025 + Jul/2026). */
+  periodos?: string[];
   codParc?: number;
   codParcs?: number[];
   gruposProduto?: string[];
@@ -75,6 +78,19 @@ function parseMesAno(iso?: string): { mes: string; ano: string } {
 function labelPeriodo(filtros: Filtros): string {
   const mesNome = (iso?: string) => MESES.find((x) => x.value === iso?.split("-")[1])?.label ?? "";
   const anoStr = (iso?: string) => iso?.split("-")[0] ?? "";
+
+  if (filtros.periodos && filtros.periodos.length > 0) {
+    const sorted = [...filtros.periodos].sort();
+    const anosPresentes = new Set(sorted.map((p) => p.split("-")[0]));
+    if (anosPresentes.size === 1 && sorted.length === 12) return `Ano ${[...anosPresentes][0]}`;
+    if (sorted.length <= 3) {
+      return sorted
+        .map((p) => `${mesNome(p)}/${p.split("-")[0].slice(2)}`)
+        .join(" + ");
+    }
+    return `${sorted.length} meses selecionados`;
+  }
+
   if (filtros.dataInicio && filtros.dataFim) {
     const ai = anoStr(filtros.dataInicio);
     const af = anoStr(filtros.dataFim);
@@ -85,29 +101,51 @@ function labelPeriodo(filtros: Filtros): string {
   return "Período";
 }
 
-// ─── Seletor de período por meses (estilo Excel) ─────────────────────────────
-function PeriodoPicker({ filtros, onChange }: { filtros: Filtros; onChange: (f: Filtros) => void }) {
-  const [open, setOpen] = useState(false);
-  const [ano, setAno] = useState(() => filtros.dataInicio?.split("-")[0] ?? "2026");
-  const ref = useRef<HTMLDivElement>(null);
+// ─── Seletor de período por meses (multi-ano, estilo Excel) ──────────────────
+// Cada ano marcado no topo abre sua própria seção de meses; os meses marcados
+// em cada seção são combinados exatamente (sem produto cartesiano), permitindo
+// selecionar por exemplo Jan/2025 + Jul/2026 sem trazer Jul/2025 ou Jan/2026 junto.
+function derivarSelecaoInicial(filtros: Filtros): { anosAtivos: string[]; selecoes: Record<string, string[]> } {
+  if (filtros.periodos && filtros.periodos.length > 0) {
+    const selecoes: Record<string, string[]> = {};
+    for (const p of filtros.periodos) {
+      const [anoP, mesP] = p.split("-");
+      if (!anoP || !mesP) continue;
+      (selecoes[anoP] ??= []).push(mesP);
+    }
+    for (const anoP of Object.keys(selecoes)) selecoes[anoP].sort();
+    return { anosAtivos: Object.keys(selecoes).sort(), selecoes };
+  }
 
-  // Meses selecionados no estado interno (antes de confirmar)
-  const mesesSelecionados = (): string[] => {
-    const ini = filtros.dataInicio;
-    const fim2 = filtros.dataFim;
-    if (!ini || !fim2) return MESES.map(m => m.value);
+  const ini = filtros.dataInicio;
+  const fim2 = filtros.dataFim;
+  if (ini && fim2) {
     const anoIni = ini.split("-")[0];
     const anoFim = fim2.split("-")[0];
-    if (anoIni !== anoFim || anoIni !== ano) return MESES.map(m => m.value);
-    return MESES.filter(m => {
-      const cur = `${ano}-${m.value}`;
-      return cur >= ini.slice(0, 7) && cur <= fim2.slice(0, 7);
-    }).map(m => m.value);
-  };
+    if (anoIni === anoFim) {
+      const meses = MESES.filter(m => {
+        const cur = `${anoIni}-${m.value}`;
+        return cur >= ini.slice(0, 7) && cur <= fim2.slice(0, 7);
+      }).map(m => m.value);
+      return { anosAtivos: [anoIni], selecoes: { [anoIni]: meses } };
+    }
+  }
+  return { anosAtivos: ["2026"], selecoes: { "2026": MESES.map(m => m.value) } };
+}
 
-  const [selecionados, setSelecionados] = useState<string[]>(mesesSelecionados);
+function PeriodoPicker({ filtros, onChange }: { filtros: Filtros; onChange: (f: Filtros) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setSelecionados(mesesSelecionados()); }, [filtros.dataInicio, filtros.dataFim, ano]);
+  const [anosAtivos, setAnosAtivos] = useState<string[]>(() => derivarSelecaoInicial(filtros).anosAtivos);
+  const [selecoes, setSelecoes] = useState<Record<string, string[]>>(() => derivarSelecaoInicial(filtros).selecoes);
+
+  useEffect(() => {
+    const estado = derivarSelecaoInicial(filtros);
+    setAnosAtivos(estado.anosAtivos);
+    setSelecoes(estado.selecoes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtros.periodos, filtros.dataInicio, filtros.dataFim]);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -117,25 +155,48 @@ function PeriodoPicker({ filtros, onChange }: { filtros: Filtros; onChange: (f: 
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const todosSelecionados = selecionados.length === MESES.length;
-
-  function toggleTodos() {
-    setSelecionados(todosSelecionados ? [] : MESES.map(m => m.value));
-  }
-
-  function toggleMes(mes: string) {
-    setSelecionados(prev =>
-      prev.includes(mes) ? prev.filter(m => m !== mes) : [...prev, mes].sort()
+  function toggleAno(anoClicado: string) {
+    setAnosAtivos(prev =>
+      prev.includes(anoClicado) ? prev.filter(a => a !== anoClicado) : [...prev, anoClicado].sort()
     );
+    setSelecoes(prev => (prev[anoClicado] ? prev : { ...prev, [anoClicado]: [] }));
   }
+
+  function toggleMes(anoAlvo: string, mes: string) {
+    setSelecoes(prev => {
+      const atual = prev[anoAlvo] ?? [];
+      const next = atual.includes(mes) ? atual.filter(m => m !== mes) : [...atual, mes].sort();
+      return { ...prev, [anoAlvo]: next };
+    });
+  }
+
+  function toggleTodosDoAno(anoAlvo: string) {
+    setSelecoes(prev => {
+      const atual = prev[anoAlvo] ?? [];
+      const todos = atual.length === MESES.length;
+      return { ...prev, [anoAlvo]: todos ? [] : MESES.map(m => m.value) };
+    });
+  }
+
+  const totalSelecionado = anosAtivos.reduce((s, a) => s + (selecoes[a]?.length ?? 0), 0);
 
   function aplicar() {
-    if (selecionados.length === 0) return;
-    const sorted = [...selecionados].sort();
-    const ini = sorted[0];
-    const fim2 = sorted[sorted.length - 1];
-    const dia = ultimoDia(ano, fim2);
-    onChange({ ...filtros, dataInicio: `${ano}-${ini}-01`, dataFim: `${ano}-${fim2}-${String(dia).padStart(2, "0")}` });
+    const periodos: string[] = [];
+    for (const anoAlvo of anosAtivos) {
+      for (const mes of selecoes[anoAlvo] ?? []) periodos.push(`${anoAlvo}-${mes}`);
+    }
+    if (periodos.length === 0) return;
+    const sorted = periodos.sort();
+    const primeiro = sorted[0];
+    const ultimo = sorted[sorted.length - 1];
+    const [anoUlt, mesUlt] = ultimo.split("-");
+    const dia = ultimoDia(anoUlt, mesUlt);
+    onChange({
+      ...filtros,
+      periodos: sorted,
+      dataInicio: `${primeiro}-01`,
+      dataFim: `${ultimo}-${String(dia).padStart(2, "0")}`,
+    });
     setOpen(false);
   }
 
@@ -152,58 +213,72 @@ function PeriodoPicker({ filtros, onChange }: { filtros: Filtros; onChange: (f: 
       </button>
 
       {open && (
-        <div className="absolute top-9 left-0 z-50 bg-card border border-border rounded-xl shadow-2xl w-[200px] overflow-hidden">
-          {/* Seletor de ano */}
+        <div className="absolute top-9 left-0 z-50 bg-card border border-border rounded-xl shadow-2xl w-[220px] overflow-hidden">
+          {/* Seletor de anos — multi-seleção */}
           <div className="flex border-b border-border">
-            {ANOS.map(a => (
-              <button
-                key={a}
-                onClick={() => setAno(a)}
-                className={`flex-1 text-[10px] font-semibold py-1.5 transition-colors ${
-                  ano === a ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                }`}
-              >
-                {a}
-              </button>
-            ))}
+            {ANOS.map(a => {
+              const isActive = anosAtivos.includes(a);
+              return (
+                <button
+                  key={a}
+                  onClick={() => toggleAno(a)}
+                  className={`flex-1 text-[10px] font-semibold py-1.5 transition-colors ${
+                    isActive ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  }`}
+                >
+                  {a}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Lista de meses com checkbox */}
-          <div className="py-1">
-            {/* Selecionar tudo */}
-            <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-accent cursor-pointer">
-              <input
-                type="checkbox"
-                checked={todosSelecionados}
-                onChange={toggleTodos}
-                className="w-3.5 h-3.5 accent-primary"
-              />
-              <span className="text-xs text-foreground font-medium">Selecionar tudo</span>
-            </label>
-            <div className="h-px bg-border mx-2 my-1" />
-            <div className="overflow-y-auto max-h-[200px]">
-              {MESES.map(m => (
-                <label key={m.value} className="flex items-center gap-2 px-3 py-1.5 hover:bg-accent cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selecionados.includes(m.value)}
-                    onChange={() => toggleMes(m.value)}
-                    className="w-3.5 h-3.5 accent-primary"
-                  />
-                  <span className="text-xs text-foreground">{m.label}/{ano.slice(2)}</span>
-                </label>
-              ))}
-            </div>
+          {/* Uma seção de meses por ano ativo */}
+          <div className="max-h-[280px] overflow-y-auto">
+            {anosAtivos.length === 0 && (
+              <p className="text-[11px] text-muted-foreground px-3 py-4 text-center">
+                Selecione um ou mais anos acima.
+              </p>
+            )}
+            {anosAtivos.map(anoAtivo => {
+              const sel = selecoes[anoAtivo] ?? [];
+              const todosSelecionados = sel.length === MESES.length;
+              return (
+                <div key={anoAtivo} className="border-b border-border last:border-b-0">
+                  <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-accent cursor-pointer bg-muted/40">
+                    <input
+                      type="checkbox"
+                      checked={todosSelecionados}
+                      onChange={() => toggleTodosDoAno(anoAtivo)}
+                      className="w-3.5 h-3.5 accent-primary"
+                    />
+                    <span className="text-xs text-foreground font-semibold">{anoAtivo} · selecionar tudo</span>
+                  </label>
+                  <div className="py-1">
+                    {MESES.map(m => (
+                      <label key={m.value} className="flex items-center gap-2 px-3 py-1 hover:bg-accent cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={sel.includes(m.value)}
+                          onChange={() => toggleMes(anoAtivo, m.value)}
+                          className="w-3.5 h-3.5 accent-primary"
+                        />
+                        <span className="text-xs text-foreground">{m.label}/{anoAtivo.slice(2)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Botão OK */}
           <div className="border-t border-border p-2">
             <button
               onClick={aplicar}
-              disabled={selecionados.length === 0}
+              disabled={totalSelecionado === 0}
               className="w-full text-xs py-1.5 rounded-md bg-primary/20 text-primary font-semibold hover:bg-primary/30 transition-colors disabled:opacity-40"
             >
-              OK
+              OK{totalSelecionado > 0 ? ` (${totalSelecionado})` : ""}
             </button>
           </div>
         </div>
@@ -243,17 +318,19 @@ export default function FiltrosGlobais({ filtros, onChange, showTipoReceita = tr
   const limpar = () => onChange({ dataInicio: "2026-01-01", dataFim: "2026-12-31" });
 
   const temFiltrosExtras = Object.entries(filtros).some(([k, v]) => {
-    if (k === "codParc" || k === "dataInicio" || k === "dataFim" || k === "codProduto" || k === "uf") return false;
+    if (k === "codParc" || k === "dataInicio" || k === "dataFim" || k === "codProduto" || k === "uf" || k === "periodos") return false;
     if (Array.isArray(v)) return v.length > 0;
     return v !== undefined && v !== "";
   });
 
   const temFiltros =
     temFiltrosExtras ||
+    (filtros.periodos?.length ?? 0) > 0 ||
     filtros.dataInicio !== "2026-01-01" ||
     filtros.dataFim !== "2026-12-31";
 
   const isAtalhoAtivo = (atalho: Atalho) => {
+    if ((filtros.periodos?.length ?? 0) > 0) return false;
     const { dataInicio, dataFim } = atalho.get();
     return filtros.dataInicio === dataInicio && filtros.dataFim === dataFim;
   };
@@ -261,9 +338,9 @@ export default function FiltrosGlobais({ filtros, onChange, showTipoReceita = tr
   const aplicarAtalho = (atalho: Atalho) => {
     const { dataInicio, dataFim } = atalho.get();
     if (isAtalhoAtivo(atalho)) {
-      onChange({ ...filtros, dataInicio: "2026-01-01", dataFim: "2026-12-31" });
+      onChange({ ...filtros, dataInicio: "2026-01-01", dataFim: "2026-12-31", periodos: undefined });
     } else {
-      onChange({ ...filtros, dataInicio, dataFim });
+      onChange({ ...filtros, dataInicio, dataFim, periodos: undefined });
     }
   };
 
