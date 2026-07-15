@@ -11,6 +11,7 @@ import {
   getHistoricoClientesEvolucaoMensal,
   getHistoricoClientesPorEstado,
   getHistoricoClientesPorSegmento,
+  getHistoricoClientesPorPerfil,
   getHistoricoClienteProdutos,
   getHistoricoClienteProdutoMensal,
   type HistoricoClientesFiltros,
@@ -25,12 +26,38 @@ import { formatMes } from '../lib/utils'
 // ─── Types ────────────────────────────────────────────────────────────────────
 const DEFAULT_FILTROS: Filtros = { dataInicio: '2026-01-01', dataFim: '2026-12-31' }
 
-type CrossFilter = { type: 'uf' | 'segmento'; value: string } | null
+type CrossFilter = { type: 'uf' | 'segmento' | 'perfil'; value: string } | null
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 const MESES_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
-const COLORS = ['#22c55e','#3b82f6','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#a78bfa']
+// Escalas monocromáticas — do mais intenso ao mais suave (mesmo padrão do Dashboard)
+// Verde = Volume · Azul = Faturamento
+const GREEN_COLORS = [
+  'oklch(0.68 0.20 145)',  // verde 1 — mais intenso
+  'oklch(0.64 0.18 145)',  // verde 2
+  'oklch(0.60 0.16 145)',  // verde 3
+  'oklch(0.56 0.14 145)',  // verde 4
+  'oklch(0.52 0.12 145)',  // verde 5
+  'oklch(0.48 0.10 145)',  // verde 6
+  'oklch(0.44 0.09 145)',  // verde 7
+  'oklch(0.40 0.07 145)',  // verde 8
+  'oklch(0.36 0.06 145)',  // verde 9
+  'oklch(0.32 0.05 145)',  // verde 10 — mais suave
+]
+
+const BLUE_COLORS = [
+  'oklch(0.68 0.16 250)',  // azul 1 — mais intenso
+  'oklch(0.64 0.14 250)',  // azul 2
+  'oklch(0.60 0.13 250)',  // azul 3
+  'oklch(0.56 0.11 250)',  // azul 4
+  'oklch(0.52 0.10 250)',  // azul 5
+  'oklch(0.48 0.09 250)',  // azul 6
+  'oklch(0.44 0.08 250)',  // azul 7
+  'oklch(0.40 0.06 250)',  // azul 8
+  'oklch(0.36 0.05 250)',  // azul 9
+  'oklch(0.32 0.04 250)',  // azul 10 — mais suave
+]
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 function fmtMi(v: number) {
@@ -78,7 +105,7 @@ function ChartTooltip({ active, payload, label }: any) {
     <div className="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs shadow-xl">
       <p className="font-semibold text-white mb-1">{label}</p>
       {payload.map((p: any) => (
-        <p key={p.name} style={{ color: p.color ?? p.fill }}>
+        <p key={p.name} className="text-white">
           {p.name}: {typeof p.value === 'number' && p.value > 1000 ? fmtNum(p.value, 0) : fmtNum(p.value)}
         </p>
       ))}
@@ -87,23 +114,38 @@ function ChartTooltip({ active, payload, label }: any) {
 }
 
 // ─── Donut Panel ──────────────────────────────────────────────────────────────
-function DonutPanel({ title, data, total, selectedName, onSliceClick }: {
+function DonutPanel({ title, data, total, selectedName, onSliceClick, colors, valueFormatter = fmtMi, metricLabel }: {
   title: string
   data: { name: string; valor: number; pct: number }[]
   total: number
   selectedName?: string | null
   onSliceClick?: (name: string) => void
+  colors: string[]
+  valueFormatter?: (v: number) => string
+  metricLabel?: string
 }) {
   const [showAll, setShowAll] = useState(false)
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const shown = showAll ? data : data.slice(0, 6)
   const hasSelection = !!selectedName
+  const hovered = hoveredIndex !== null ? data[hoveredIndex] : null
 
   return (
     <div className={`bg-slate-800 border rounded-xl overflow-hidden transition-colors ${hasSelection ? 'border-green-600/50' : 'border-slate-700'}`}>
-      <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-        <p className="text-sm font-semibold text-white">{title}</p>
+      <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <p className="text-sm font-semibold text-white truncate">{title}</p>
+          {metricLabel && (
+            <span
+              className="text-[10px] font-medium px-1.5 py-0.5 rounded border shrink-0"
+              style={{ color: colors[0], borderColor: colors[0] }}
+            >
+              {metricLabel}
+            </span>
+          )}
+        </div>
         {hasSelection && (
-          <button onClick={() => onSliceClick?.(selectedName!)} className="text-[10px] text-green-400 hover:text-green-300 flex items-center gap-1">
+          <button onClick={() => onSliceClick?.(selectedName!)} className="text-[10px] text-green-400 hover:text-green-300 flex items-center gap-1 shrink-0">
             <X className="w-3 h-3" /> {selectedName}
           </button>
         )}
@@ -120,12 +162,14 @@ function DonutPanel({ title, data, total, selectedName, onSliceClick }: {
               paddingAngle={2}
               startAngle={90} endAngle={-270}
               onClick={(d: any) => onSliceClick?.(d.name)}
+              onMouseEnter={(_d: any, index: number) => setHoveredIndex(index)}
+              onMouseLeave={() => setHoveredIndex(null)}
               style={{ cursor: onSliceClick ? 'pointer' : 'default' }}
             >
               {data.map((d, i) => (
                 <Cell
                   key={i}
-                  fill={COLORS[i % COLORS.length]}
+                  fill={colors[i % colors.length]}
                   opacity={hasSelection && selectedName !== d.name ? 0.3 : 1}
                   stroke={selectedName === d.name ? '#fff' : 'none'}
                   strokeWidth={selectedName === d.name ? 1.5 : 0}
@@ -133,9 +177,19 @@ function DonutPanel({ title, data, total, selectedName, onSliceClick }: {
               ))}
             </Pie>
           </PieChart>
-          <div className="absolute text-center pointer-events-none">
-            <p className="text-[10px] text-slate-400 leading-none">{hasSelection ? 'Filtrado' : 'Total'}</p>
-            <p className="text-xs font-bold text-white mt-0.5">{fmtMi(total)}</p>
+          <div className="absolute text-center pointer-events-none px-3 max-w-[120px]">
+            {hovered ? (
+              <>
+                <p className="text-[10px] text-slate-400 leading-none truncate">{hovered.name}</p>
+                <p className="text-xs font-bold text-white mt-0.5">{valueFormatter(hovered.valor)}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{fmtNum(hovered.pct, 1)}%</p>
+              </>
+            ) : (
+              <>
+                <p className="text-[10px] text-slate-400 leading-none">{hasSelection ? 'Filtrado' : 'Total'}</p>
+                <p className="text-xs font-bold text-white mt-0.5">{valueFormatter(total)}</p>
+              </>
+            )}
           </div>
         </div>
         <div className="space-y-1.5">
@@ -143,14 +197,16 @@ function DonutPanel({ title, data, total, selectedName, onSliceClick }: {
             <div
               key={d.name}
               onClick={() => onSliceClick?.(d.name)}
+              onMouseEnter={() => setHoveredIndex(i)}
+              onMouseLeave={() => setHoveredIndex(null)}
               className={`flex items-center gap-2 rounded px-1 -mx-1 transition-opacity ${
                 onSliceClick ? 'cursor-pointer hover:bg-white/5' : ''
               } ${hasSelection && selectedName !== d.name ? 'opacity-30' : ''} ${selectedName === d.name ? 'bg-white/5' : ''}`}
             >
-              <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
+              <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: colors[i % colors.length] }} />
               <span className="flex-1 text-[11px] text-slate-300 truncate">{d.name}</span>
               <span className="text-[11px] text-slate-400 shrink-0">{fmtNum(d.pct, 1)}%</span>
-              <span className="text-[11px] font-medium text-white shrink-0 min-w-[60px] text-right">{fmtMi(d.valor)}</span>
+              <span className="text-[11px] font-medium text-white shrink-0 min-w-[60px] text-right">{valueFormatter(d.valor)}</span>
             </div>
           ))}
         </div>
@@ -425,6 +481,7 @@ export default function HistoricoClientes() {
     const base = toBackend(filtros, projetosAtivos)
     if (crossFilter?.type === 'uf') return { ...base, ufs: [crossFilter.value] }
     if (crossFilter?.type === 'segmento') return { ...base, gruposProduto: [...(base.gruposProduto ?? []), crossFilter.value] }
+    if (crossFilter?.type === 'perfil') return { ...base, perfis: [crossFilter.value] }
     return base
   }, [filtros, projetosAtivos, crossFilter])
 
@@ -466,6 +523,12 @@ export default function HistoricoClientes() {
     ...queryOpts,
   })
 
+  const { data: perfis } = useQuery({
+    queryKey: ['historico-clientes', 'por-perfil', donutQueryInput],
+    queryFn: () => getHistoricoClientesPorPerfil(donutQueryInput),
+    ...queryOpts,
+  })
+
   const clienteSelecionado = useMemo(
     () => (clientes ?? []).find(c => c.codParc === expandedParc) ?? null,
     [clientes, expandedParc]
@@ -488,6 +551,12 @@ export default function HistoricoClientes() {
 
   function handleSegmentoClick(seg: string) {
     setCrossFilter(f => f?.type === 'segmento' && f.value === seg ? null : { type: 'segmento', value: seg })
+    setExpandedParc(null)
+    setProductCrossFilter(null)
+  }
+
+  function handlePerfilClick(perfil: string) {
+    setCrossFilter(f => f?.type === 'perfil' && f.value === perfil ? null : { type: 'perfil', value: perfil })
     setExpandedParc(null)
     setProductCrossFilter(null)
   }
@@ -534,18 +603,36 @@ export default function HistoricoClientes() {
         }
   ), [evolucaoView])
 
-  const estadosDonut = useMemo(() =>
-    (estados ?? []).map(r => ({ name: r.uf, valor: r.valor, pct: r.pct })),
-    [estados]
-  )
+  // Donuts acompanham a métrica selecionada na Evolução Mensal:
+  // Faturamento → tons de azul · Volume → tons de verde
+  const donutColors = evolucaoConfig.dataKey === 'valor' ? BLUE_COLORS : GREEN_COLORS
+  const donutValueFormatter = evolucaoConfig.dataKey === 'valor' ? fmtMi : fmtKg
+  const donutMetricLabel = evolucaoConfig.dataKey === 'valor' ? 'Faturamento' : 'Volume'
 
-  const segmentosDonut = useMemo(() =>
-    (segmentos ?? []).map(r => ({ name: r.segmento, valor: r.valor, pct: r.pct })),
-    [segmentos]
-  )
+  const estadosDonut = useMemo(() => {
+    const rows = estados ?? []
+    const value = (r: (typeof rows)[number]) => evolucaoConfig.dataKey === 'valor' ? r.valor : r.volume
+    const total = rows.reduce((s, r) => s + value(r), 0)
+    return rows.map(r => ({ name: r.uf, valor: value(r), pct: total > 0 ? (value(r) / total) * 100 : 0 }))
+  }, [estados, evolucaoConfig.dataKey])
+
+  const segmentosDonut = useMemo(() => {
+    const rows = segmentos ?? []
+    const value = (r: (typeof rows)[number]) => evolucaoConfig.dataKey === 'valor' ? r.valor : r.volume
+    const total = rows.reduce((s, r) => s + value(r), 0)
+    return rows.map(r => ({ name: r.segmento, valor: value(r), pct: total > 0 ? (value(r) / total) * 100 : 0 }))
+  }, [segmentos, evolucaoConfig.dataKey])
+
+  const perfisDonut = useMemo(() => {
+    const rows = perfis ?? []
+    const value = (r: (typeof rows)[number]) => evolucaoConfig.dataKey === 'valor' ? r.valor : r.volume
+    const total = rows.reduce((s, r) => s + value(r), 0)
+    return rows.map(r => ({ name: r.perfil, valor: value(r), pct: total > 0 ? (value(r) / total) * 100 : 0 }))
+  }, [perfis, evolucaoConfig.dataKey])
 
   const totalEstados = useMemo(() => estadosDonut.reduce((s, r) => s + r.valor, 0), [estadosDonut])
   const totalSegmentos = useMemo(() => segmentosDonut.reduce((s, r) => s + r.valor, 0), [segmentosDonut])
+  const totalPerfis = useMemo(() => perfisDonut.reduce((s, r) => s + r.valor, 0), [perfisDonut])
 
   const clientesTotal = useMemo(() => ({
     valor: (clientes ?? []).reduce((s, r) => s + r.valor, 0),
@@ -738,7 +825,7 @@ export default function HistoricoClientes() {
           )}
           {crossFilter && (
             <span className="ml-auto text-[11px] bg-blue-900/40 text-blue-400 border border-blue-700/50 px-2 py-0.5 rounded-full flex items-center gap-1">
-              Filtrando por {crossFilter.type === 'uf' ? 'Estado' : 'Segmento'}: {crossFilter.value}
+              Filtrando por {crossFilter.type === 'uf' ? 'Estado' : crossFilter.type === 'segmento' ? 'Segmento' : 'Perfil'}: {crossFilter.value}
               <button onClick={() => setCrossFilter(null)} className="hover:text-white"><X className="w-3 h-3" /></button>
             </span>
           )}
@@ -770,7 +857,7 @@ export default function HistoricoClientes() {
                       key={c.codParc}
                       c={c}
                       rank={i + 1}
-                      baseFiltros={toBackend(filtros, projetosAtivos)}
+                      baseFiltros={withMonth(toBackend(filtros, projetosAtivos), monthCrossFilter)}
                       isExpanded={expandedParc === c.codParc}
                       onToggle={() => toggleCliente(c.codParc)}
                       dimmed={expandedParc !== null && expandedParc !== c.codParc}
@@ -802,7 +889,7 @@ export default function HistoricoClientes() {
       </div>
 
       {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Estado Donut */}
         <DonutPanel
           title={expandedParc ? 'Estado — cliente selecionado' : 'Representatividade por Estado'}
@@ -810,6 +897,9 @@ export default function HistoricoClientes() {
           total={totalEstados}
           selectedName={crossFilter?.type === 'uf' ? crossFilter.value : null}
           onSliceClick={handleEstadoClick}
+          colors={donutColors}
+          valueFormatter={donutValueFormatter}
+          metricLabel={donutMetricLabel}
         />
 
         {/* Segmento Donut */}
@@ -819,6 +909,21 @@ export default function HistoricoClientes() {
           total={totalSegmentos}
           selectedName={crossFilter?.type === 'segmento' ? crossFilter.value : null}
           onSliceClick={handleSegmentoClick}
+          colors={donutColors}
+          valueFormatter={donutValueFormatter}
+          metricLabel={donutMetricLabel}
+        />
+
+        {/* Perfil do Parceiro Donut */}
+        <DonutPanel
+          title={expandedParc ? 'Perfil do Parceiro — cliente selecionado' : 'Perfil do Parceiro'}
+          data={perfisDonut}
+          total={totalPerfis}
+          selectedName={crossFilter?.type === 'perfil' ? crossFilter.value : null}
+          onSliceClick={handlePerfilClick}
+          colors={donutColors}
+          valueFormatter={donutValueFormatter}
+          metricLabel={donutMetricLabel}
         />
       </div>
     </div>

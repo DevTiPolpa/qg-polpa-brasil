@@ -711,6 +711,7 @@ export type HistoricoClientesFiltros = {
   dataFim?: string
   projetos?: string[]
   periodos?: string[]
+  perfis?: string[]
 }
 
 export type HistoricoClientesFiltrosDisponiveis = {
@@ -764,6 +765,13 @@ export type HistoricoClientesSegmentoItem = {
   pct: number
 }
 
+export type HistoricoClientesPerfilItem = {
+  perfil: string
+  valor: number
+  volume: number
+  pct: number
+}
+
 export type HistoricoClienteProdutoItem = {
   codProduto: string
   nomeProduto: string
@@ -793,6 +801,7 @@ function buildHistoricoClientesParams(filtros: HistoricoClientesFiltros = {}) {
   appendHistoricoClientesArrayParam(params, 'codProdutos', filtros.codProdutos)
   appendHistoricoClientesArrayParam(params, 'projetos', filtros.projetos)
   appendHistoricoClientesArrayParam(params, 'periodos', filtros.periodos)
+  appendHistoricoClientesArrayParam(params, 'perfis', filtros.perfis)
   if (filtros.dataInicio) params.set('dataInicio', filtros.dataInicio)
   if (filtros.dataFim) params.set('dataFim', filtros.dataFim)
   const query = params.toString()
@@ -821,6 +830,10 @@ export async function getHistoricoClientesPorEstado(filtros: HistoricoClientesFi
 
 export async function getHistoricoClientesPorSegmento(filtros: HistoricoClientesFiltros = {}): Promise<HistoricoClientesSegmentoItem[]> {
   return apiRequest<HistoricoClientesSegmentoItem[]>(`/api/historico-clientes/por-segmento${buildHistoricoClientesParams(filtros)}`)
+}
+
+export async function getHistoricoClientesPorPerfil(filtros: HistoricoClientesFiltros = {}): Promise<HistoricoClientesPerfilItem[]> {
+  return apiRequest<HistoricoClientesPerfilItem[]>(`/api/historico-clientes/por-perfil${buildHistoricoClientesParams(filtros)}`)
 }
 
 export async function getHistoricoClienteProdutos(codParc: number, filtros: HistoricoClientesFiltros = {}): Promise<HistoricoClienteProdutoItem[]> {
