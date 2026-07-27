@@ -1296,3 +1296,79 @@ export async function deleteChatSession(sessionId: string): Promise<{ success: b
     method: 'DELETE',
   })
 }
+
+// ─── Funil Scorecard ───────────────────────────────────────────────────────
+export type FunilScorecardRecorte = 'semana_atual' | 'semana_anterior' | 'mes_atual' | 'mes_anterior'
+export type FunilScorecardCadenciaKey = FunilScorecardRecorte | 'semana_retrasada'
+export type FunilScorecardCor = 'verde' | 'amarelo' | 'vermelho'
+
+export type FunilScorecardCadenciaVendedorRow = {
+  nome: string
+  abertos: number
+  ganhos: number
+  perdidos: number
+  avancaram: number
+  saldo: number
+}
+
+export type FunilScorecardCadenciaRecorte = {
+  label: string
+  vendedores: FunilScorecardCadenciaVendedorRow[]
+  totais: Omit<FunilScorecardCadenciaVendedorRow, 'nome'>
+}
+
+export type FunilScorecardLuzes = {
+  abertos: FunilScorecardCor
+  ganhos: FunilScorecardCor
+  saldo: FunilScorecardCor
+  perdidos: FunilScorecardCor
+  taxaPerda: number
+}
+
+export type FunilScorecardSaudeVendedorRow = {
+  nome: string
+  ativos: number
+  foraSla: number
+  semFollowup: number
+  pctSla: number | null
+  pctFu: number | null
+}
+
+export type FunilScorecardAcaoRow = {
+  titulo: string
+  vendedor: string
+  fase: string
+  dias: number
+  sla: number
+}
+
+export type FunilScorecardResponse = {
+  resultado: {
+    ano: number
+    metaAno: number
+    realizadoAno: number
+    pctAno: number
+    trimestreLabel: string
+    metaTri: number
+    realizadoTri: number
+    pctTri: number
+  }
+  cadencia: Record<FunilScorecardCadenciaKey, FunilScorecardCadenciaRecorte>
+  luzes: FunilScorecardLuzes | null
+  veredito: string
+  saude: {
+    porVendedor: FunilScorecardSaudeVendedorRow[]
+    totalAtivos: number
+    totalForaSla: number
+    totalSemFollowup: number
+    pctSlaAgregado: number
+    pctFuAgregado: number
+    estagnado: number
+  }
+  acao: FunilScorecardAcaoRow[]
+  acaoTotal: number
+}
+
+export async function getFunilScorecardDashboard(recorte: FunilScorecardRecorte): Promise<FunilScorecardResponse> {
+  return apiRequest<FunilScorecardResponse>(`/api/funil-scorecard/dashboard?recorte=${recorte}`)
+}

@@ -15,6 +15,7 @@ import PanoramaCrm from './pages/PanoramaCrm'
 import Chat from './pages/Chat'
 import SnapshotComparativo from './pages/SnapshotComparativo'
 import HistoricoClientes from './pages/HistoricoClientes'
+import FunilScorecard from './pages/FunilScorecard'
 
 function AppRoutes() {
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -62,6 +63,7 @@ function AppRoutes() {
         <Route path="/historico-clientes" component={HistoricoClientes} />
         <Route path="/funil-vendas" component={FunilVendas} />
         <Route path="/panorama-crm" component={PanoramaCrm} />
+        <Route path="/funil-scorecard" component={FunilScorecard} />
         {user.role === 'ADMIN' && <Route path="/chat" component={Chat} />}
         {user.role === 'ADMIN' && <Route path="/usuarios" component={Usuarios} />}
         {user.role === 'ADMIN' && <Route path="/metas" component={Metas} />}
