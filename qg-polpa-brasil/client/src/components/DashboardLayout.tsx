@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLocation } from 'wouter'
 import {
   LayoutDashboard, Users, UserCog, LogOut,
-  ChevronLeft, ChevronRight, FolderOpen, TrendingUp, BarChart2, Target, Menu, X, MessageSquare, History,
+  ChevronLeft, ChevronRight, FolderOpen, BarChart2, Target, Menu, X, MessageSquare, History, Gauge,
 } from 'lucide-react'
 import { logout } from '../lib/api'
 
@@ -26,8 +26,8 @@ const menuGroups = [
 const crmMenuGroup = {
   group: 'CRM',
   items: [
-    { icon: TrendingUp,    label: 'Funil de Vendas', path: '/funil-vendas' },
     { icon: BarChart2,     label: 'Panorama CRM',    path: '/panorama-crm' },
+    { icon: Gauge,         label: 'Scorecard',       path: '/funil-scorecard' },
   ],
 }
 
