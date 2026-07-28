@@ -16,6 +16,12 @@ import Chat from './pages/Chat'
 import SnapshotComparativo from './pages/SnapshotComparativo'
 import HistoricoClientes from './pages/HistoricoClientes'
 import FunilScorecard from './pages/FunilScorecard'
+import GeracaoListasHistorico from './pages/GeracaoListasHistorico'
+import GeracaoListasNovo from './pages/GeracaoListasNovo'
+import GeracaoListasChat from './pages/GeracaoListasChat'
+import GeracaoListasValidar from './pages/GeracaoListasValidar'
+import GeracaoListasBuscar from './pages/GeracaoListasBuscar'
+import GeracaoListasCard from './pages/GeracaoListasCard'
 
 function AppRoutes() {
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -64,6 +70,12 @@ function AppRoutes() {
         <Route path="/funil-vendas" component={FunilVendas} />
         <Route path="/panorama-crm" component={PanoramaCrm} />
         <Route path="/funil-scorecard" component={FunilScorecard} />
+        <Route path="/geracao-listas" component={GeracaoListasHistorico} />
+        <Route path="/geracao-listas/novo" component={GeracaoListasNovo} />
+        <Route path="/geracao-listas/novo/chat" component={GeracaoListasChat} />
+        <Route path="/geracao-listas/novo/validar" component={GeracaoListasValidar} />
+        <Route path="/geracao-listas/buscar" component={GeracaoListasBuscar} />
+        <Route path="/geracao-listas/:id" component={GeracaoListasCard} />
         {user.role === 'ADMIN' && <Route path="/chat" component={Chat} />}
         {user.role === 'ADMIN' && <Route path="/usuarios" component={Usuarios} />}
         {user.role === 'ADMIN' && <Route path="/metas" component={Metas} />}

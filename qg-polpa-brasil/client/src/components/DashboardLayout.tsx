@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLocation } from 'wouter'
 import {
   LayoutDashboard, Users, UserCog, LogOut,
-  ChevronLeft, ChevronRight, FolderOpen, BarChart2, Target, Menu, X, MessageSquare, History, Gauge,
+  ChevronLeft, ChevronRight, FolderOpen, BarChart2, Target, Menu, X, MessageSquare, History, Gauge, ListChecks,
 } from 'lucide-react'
 import { logout } from '../lib/api'
 
@@ -28,6 +28,7 @@ const crmMenuGroup = {
   items: [
     { icon: BarChart2,     label: 'Panorama CRM',    path: '/panorama-crm' },
     { icon: Gauge,         label: 'Scorecard',       path: '/funil-scorecard' },
+    { icon: ListChecks,    label: 'Geração de Listas', path: '/geracao-listas' },
   ],
 }
 
@@ -104,7 +105,7 @@ export default function DashboardLayout({ children, user }: Props) {
             )}
             <ul className="space-y-0.5">
               {group.items.map(item => {
-                const active = location === item.path
+                const active = location === item.path || (item.path !== '/' && location.startsWith(item.path + '/'))
                 return (
                   <li key={item.path}>
                     <button
