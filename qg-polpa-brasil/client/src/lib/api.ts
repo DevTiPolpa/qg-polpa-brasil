@@ -1,15 +1,31 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8010'
+const REQUEST_TIMEOUT_MS = 15000
 
 async function apiRequest<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true',
-      ...(options?.headers ?? {}),
-    },
-  })
+  const fullUrl = `${API_BASE_URL}${path}`
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+  let response: Response
+  try {
+    response = await fetch(fullUrl, {
+      ...options,
+      credentials: 'include',
+      signal: options?.signal ?? controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+        ...(options?.headers ?? {}),
+      },
+    })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error(`Sem resposta do servidor em ${REQUEST_TIMEOUT_MS / 1000}s (${path}). Tente novamente.`)
+    }
+    throw error
+  } finally {
+    clearTimeout(timeoutId)
+  }
 
   if (!response.ok) {
     let message = `Erro HTTP ${response.status}`
@@ -1371,4 +1387,161 @@ export type FunilScorecardResponse = {
 
 export async function getFunilScorecardDashboard(recorte: FunilScorecardRecorte): Promise<FunilScorecardResponse> {
   return apiRequest<FunilScorecardResponse>(`/api/funil-scorecard/dashboard?recorte=${recorte}`)
+}
+
+// ─── Geração de Listas ─────────────────────────────────────────────────────
+export type GeracaoListasClasse = 'LIVRE' | 'REVISAR' | 'BLOQUEADA'
+export type GeracaoListasStatus = 'BRIEFING' | 'PROMPT_GERADO' | 'AGUARDANDO_UPLOAD' | 'LISTA_CLASSIFICADA'
+export type GeracaoListasFonteBloqueio = 'FATO_VENDAS' | 'CRM_LEAD' | 'CRM_DEAL' | 'CRM_COMPANY'
+
+export type GeracaoListasBriefing = {
+  segmento: string
+  segmentoCanonico: string | null
+  aplicacao: string
+  quantidade: string
+  profundidadePesquisa: 'profunda' | 'ampla'
+  tipoEmpresa: 'somente_matriz' | 'matriz_e_filiais'
+  regiao: string | null
+  porte: string | null
+  lookAlike: string | null
+  observacoes: string | null
+}
+
+export type GeracaoListasCardResumo = {
+  id: number
+  titulo: string | null
+  createdBy: string | null
+  createdAt: string
+  status: GeracaoListasStatus
+  segmento: string | null
+  totalManus: number | null
+  totalLivre: number | null
+  totalRevisar: number | null
+  totalBloqueada: number | null
+}
+
+export type GeracaoListasItemClassificado = {
+  nome: string
+  cidade: string | null
+  uf: string | null
+  cnpj: string | null
+  site: string | null
+  telefone: string | null
+  email: string | null
+  marca: string | null
+  classe: GeracaoListasClasse
+  motivo: string
+  fonteBloqueio: GeracaoListasFonteBloqueio | null
+  matchRefNome: string | null
+  matchScore: number | null
+  responsavel: string | null
+}
+
+export type GeracaoListasAvaliacao = {
+  totalManus: number
+  totalLivre: number
+  totalRevisar: number
+  totalBloqueada: number
+  bloqueadaClienteAtivo: number
+  bloqueadaCrmLead: number
+  bloqueadaCrmDeal: number
+  pctAderencia: number
+  pctCnpjPresente: number
+  pctContatoPresente: number
+  saturacaoAlerta: boolean
+}
+
+export type GeracaoListasCardDetalhado = GeracaoListasCardResumo & {
+  briefing: GeracaoListasBriefing | null
+  promptTexto: string | null
+  exclusionCount: number | null
+  truncado: boolean | null
+  itens: GeracaoListasItemClassificado[]
+  avaliacao: GeracaoListasAvaliacao | null
+}
+
+export type GeracaoListasCandidato = {
+  nomeOriginal: string
+  fonte: GeracaoListasFonteBloqueio
+  score: number
+  cnpjBate: boolean
+  responsavel: string | null
+}
+
+export type GeracaoListasVeredito = {
+  classe: GeracaoListasClasse
+  motivo: string
+  fonteBloqueio: string | null
+  matchRefNome: string | null
+  matchScore: number | null
+  responsavel: string | null
+}
+
+export async function listarGeracaoListasCards(opts: { todas?: boolean } = {}): Promise<GeracaoListasCardResumo[]> {
+  const query = opts.todas ? '?todas=true' : ''
+  return apiRequest<GeracaoListasCardResumo[]>(`/api/geracao-listas/cards${query}`)
+}
+
+export async function obterGeracaoListasCard(cardId: number): Promise<GeracaoListasCardDetalhado> {
+  return apiRequest<GeracaoListasCardDetalhado>(`/api/geracao-listas/cards/${cardId}`)
+}
+
+export async function criarGeracaoListasCardValidacao(payload: { titulo?: string }): Promise<{ cardId: number }> {
+  return apiRequest<{ cardId: number }>('/api/geracao-listas/cards/validacao', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function chatGeracaoListasBriefing(payload: { message: string; history: unknown[] }): Promise<{
+  resposta: string
+  history: unknown[]
+  briefing: GeracaoListasBriefing | null
+}> {
+  return apiRequest('/api/geracao-listas/briefing/chat', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function finalizarGeracaoListasBriefing(payload: { briefing: GeracaoListasBriefing; conversa: unknown[] }): Promise<{
+  cardId: number
+  prompt: string
+  exclusionCount: number
+  truncado: boolean
+}> {
+  return apiRequest('/api/geracao-listas/briefing/finalizar', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function classificarGeracaoListasLista(payload: {
+  cardId: number
+  arquivoBase64?: string
+  nomeArquivo?: string
+  textoColado?: string
+}): Promise<{ itens: GeracaoListasItemClassificado[]; avaliacao: GeracaoListasAvaliacao }> {
+  const { cardId, ...body } = payload
+  return apiRequest(`/api/geracao-listas/cards/${cardId}/classificar`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function exportarGeracaoListasExcel(cardId: number): Promise<{ nomeArquivo: string; conteudoBase64: string }> {
+  return apiRequest(`/api/geracao-listas/cards/${cardId}/exportar`, { method: 'POST' })
+}
+
+export async function excluirGeracaoListasCard(cardId: number): Promise<{ ok: true }> {
+  return apiRequest(`/api/geracao-listas/cards/${cardId}`, { method: 'DELETE' })
+}
+
+export async function buscarGeracaoListasEmpresa(payload: { nome: string; cnpj?: string }): Promise<{
+  veredito: GeracaoListasVeredito
+  candidatos: GeracaoListasCandidato[]
+}> {
+  const params = new URLSearchParams({ nome: payload.nome })
+  if (payload.cnpj) params.set('cnpj', payload.cnpj)
+  return apiRequest(`/api/geracao-listas/buscar?${params.toString()}`)
 }
