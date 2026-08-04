@@ -453,6 +453,9 @@ export type DashboardOriginalEvolucao = {
   vendaFirme: number
   forecast: number
   novoProjeto: number
+  volumeVendaFirme: number
+  volumeForecast: number
+  volumeNovoProjeto: number
 }
 
 export type DashboardOriginalEvolucaoAnoAnterior = {
@@ -529,6 +532,38 @@ export type DashboardOriginalClienteMix = {
   volume: number
 }
 
+export type DashboardOriginalProdutoTop = {
+  codProduto: number
+  nomeProduto: string | null
+  grupoProduto: string | null
+  faturamento: number
+  volume: number
+  clientes: number
+}
+
+export type DashboardOriginalProdutoMix = {
+  codParc: number
+  razaoSocial: string | null
+  faturamento: number
+  volume: number
+}
+
+export type DashboardOriginalRegiaoTop = {
+  regiao: string
+  faturamento: number
+  volume: number
+  clientes: number
+  estados: number
+}
+
+export type DashboardOriginalRegiaoMix = {
+  uf: string
+  nomeEstado: string | null
+  faturamento: number
+  volume: number
+  clientes: number
+}
+
 export type DashboardOriginalFiltrosDisponiveis = {
   mercados: string[]
   vendedores: string[]
@@ -548,6 +583,8 @@ export type DashboardOriginalResumo = {
   segmentos: DashboardOriginalSegmento[]
   projetos: DashboardOriginalProjeto[]
   clientesTop: DashboardOriginalClienteTop[]
+  produtosTop: DashboardOriginalProdutoTop[]
+  regioesTop: DashboardOriginalRegiaoTop[]
   orcamentoKpis: DashboardOriginalOrcamentoKpis
   orcamentoMensal: DashboardOriginalOrcamentoMensal[]
 }
@@ -586,6 +623,19 @@ export async function getDashboardOriginalClienteMix(codParc: number, filtros: D
   appendDashboardFiltros(params, filtros)
   params.set('limit', String(limit))
   return apiRequest<DashboardOriginalClienteMix[]>(`/api/dashboard-original/clientes/${codParc}/mix?${params.toString()}`)
+}
+
+export async function getDashboardOriginalProdutoMix(codProduto: number, filtros: DashboardOriginalFiltros = {}, limit = 30): Promise<DashboardOriginalProdutoMix[]> {
+  const params = new URLSearchParams()
+  appendDashboardFiltros(params, filtros)
+  params.set('limit', String(limit))
+  return apiRequest<DashboardOriginalProdutoMix[]>(`/api/dashboard-original/produtos/${codProduto}/mix?${params.toString()}`)
+}
+
+export async function getDashboardOriginalRegiaoMix(regiao: string, filtros: DashboardOriginalFiltros = {}): Promise<DashboardOriginalRegiaoMix[]> {
+  const params = new URLSearchParams()
+  appendDashboardFiltros(params, filtros)
+  return apiRequest<DashboardOriginalRegiaoMix[]>(`/api/dashboard-original/regioes/${encodeURIComponent(regiao)}/mix?${params.toString()}`)
 }
 
 export async function getDashboardOriginalFiltrosDisponiveis(): Promise<DashboardOriginalFiltrosDisponiveis> {

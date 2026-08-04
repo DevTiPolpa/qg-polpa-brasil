@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getDashboardOriginalClienteMix, getDashboardOriginalDrilldown, getDashboardOriginalResumo, type DashboardOriginalFiltros } from "@/lib/api";
+import { getDashboardOriginalClienteMix, getDashboardOriginalProdutoMix, getDashboardOriginalRegiaoMix, getDashboardOriginalDrilldown, getDashboardOriginalResumo, type DashboardOriginalFiltros } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -88,7 +88,7 @@ function KpiCard({ label, sub, value, icon: Icon, iconClass, loading, onClick, a
   );
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label, metric = "faturamento" }: any) => {
   if (!active || !payload?.length) return null;
   const order = ["Venda Firme", "Forecast", "Novo Projeto"];
   const LINHAS_REFERENCIA = ["Ano Anterior", "Orçamento"];
@@ -97,6 +97,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   const orcEntry = payload.find((p: any) => p.name === "Orçamento");
   const sorted = [...seriesAtuais].sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
   const total = sorted.reduce((acc: number, p: any) => acc + (p.value ?? 0), 0);
+  const fmt = metric === "volume" ? formatKg : formatCurrency;
   return (
     <div className="bg-card border border-border rounded-xl px-4 py-3 shadow-2xl text-sm min-w-[230px]">
       <p className="text-white font-semibold mb-3 text-xs uppercase tracking-wide">{label}</p>
@@ -107,13 +108,13 @@ const CustomTooltip = ({ active, payload, label }: any) => {
               <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: p.color }} />
               <span className="text-slate-300 text-xs">{p.name}</span>
             </div>
-            <span className="font-semibold text-white text-xs tabular-nums">{formatCurrency(p.value)}</span>
+            <span className="font-semibold text-white text-xs tabular-nums">{fmt(p.value)}</span>
           </div>
         ))}
       </div>
       <div className="border-t border-border mt-3 pt-2 flex items-center justify-between">
         <span className="text-slate-300 text-xs font-medium">Total Atual</span>
-        <span className="font-bold text-white text-sm tabular-nums">{formatCurrency(total)}</span>
+        <span className="font-bold text-white text-sm tabular-nums">{fmt(total)}</span>
       </div>
       {orcEntry != null && orcEntry.value != null && (
         <div className="border-t border-dashed border-border/60 mt-2 pt-2 flex items-center justify-between">
@@ -121,7 +122,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
             <div className="w-5 h-0 border-t-2 border-dashed" style={{ borderColor: orcEntry.color }} />
             <span className="text-slate-300 text-xs">Orçamento</span>
           </div>
-          <span className="text-slate-300 text-xs tabular-nums">{formatCurrency(orcEntry.value)}</span>
+          <span className="text-slate-300 text-xs tabular-nums">{fmt(orcEntry.value)}</span>
         </div>
       )}
       {antEntry != null && antEntry.value != null && (
@@ -130,7 +131,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
             <div className="w-5 h-0 border-t-2 border-dashed" style={{ borderColor: antEntry.color }} />
             <span className="text-slate-300 text-xs">Ano Anterior</span>
           </div>
-          <span className="text-slate-300 text-xs tabular-nums">{formatCurrency(antEntry.value)}</span>
+          <span className="text-slate-300 text-xs tabular-nums">{fmt(antEntry.value)}</span>
         </div>
       )}
     </div>
@@ -414,10 +415,16 @@ const CLI_COLORS = [
 ];
 
 // Linha de cliente com expand/collapse de produtos
-function ClienteTopRow({ cli, i, totalFat, filtrosCombinados }: {
+// Formata um valor conforme a métrica ativa no toggle Faturamento/Volume
+function formatByMetric(metric: "faturamento" | "volume", value: number): string {
+  return metric === "volume" ? formatKg(value) : formatCurrency(value);
+}
+
+function ClienteTopRow({ cli, i, totalValor, metric, filtrosCombinados }: {
   cli: { razaoSocial: string; faturamento: number; volume: number; produtos: number; codParc?: number };
   i: number;
-  totalFat: number;
+  totalValor: number;
+  metric: "faturamento" | "volume";
   filtrosCombinados?: Record<string, any>;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -426,10 +433,13 @@ function ClienteTopRow({ cli, i, totalFat, filtrosCombinados }: {
     queryFn: () => getDashboardOriginalClienteMix(cli.codParc!, filtrosCombinados as DashboardOriginalFiltros),
     enabled: expanded && !!cli.codParc,
   });
-  const fat = Number(cli.faturamento);
-  const pct = totalFat > 0 ? (fat / totalFat) * 100 : 0;
+  const valor = metric === "volume" ? Number(cli.volume) : Number(cli.faturamento);
+  const pct = totalValor > 0 ? (valor / totalValor) * 100 : 0;
   const color = CLI_COLORS[i % CLI_COLORS.length];
   const label = cli.razaoSocial || "Cliente";
+  const mixOrdenado = [...mix].sort((a: any, b: any) =>
+    metric === "volume" ? Number(b.volume) - Number(a.volume) : Number(b.faturamento) - Number(a.faturamento)
+  );
   return (
     <div className="rounded-lg border border-transparent hover:border-border/40 transition-all duration-150">
       <div className="space-y-1 px-1.5 py-0.5">
@@ -451,7 +461,7 @@ function ClienteTopRow({ cli, i, totalFat, filtrosCombinados }: {
             >{label}</span>
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-2">
-            <span className="font-semibold text-foreground tabular-nums">{formatCurrency(fat)}</span>
+            <span className="font-semibold text-foreground tabular-nums">{formatByMetric(metric, valor)}</span>
             <span className="text-[11px] font-bold tabular-nums w-9 text-right" style={{ color }}>{pct.toFixed(1)}%</span>
           </div>
         </div>
@@ -464,14 +474,14 @@ function ClienteTopRow({ cli, i, totalFat, filtrosCombinados }: {
         <div className="ml-7 mr-2 mb-1.5 mt-0.5 pl-2 border-l-2 border-border">
           {loadingMix ? (
             <p className="text-[11px] text-muted-foreground py-1">Carregando...</p>
-          ) : !mix || mix.length === 0 ? (
+          ) : !mixOrdenado || mixOrdenado.length === 0 ? (
             <p className="text-[11px] text-muted-foreground py-1">Nenhum produto encontrado</p>
           ) : (
             <div className="space-y-0.5 py-0.5">
-              {mix.map((p: any, j: number) => (
+              {mixOrdenado.map((p: any, j: number) => (
                 <div key={j} className="flex items-center justify-between text-[11px] py-0.5">
                   <span className="text-muted-foreground truncate max-w-[160px]" title={p.nomeProduto ?? "-"}>{p.nomeProduto ?? "-"}</span>
-                  <span className="text-foreground tabular-nums shrink-0 ml-2">{formatCurrency(Number(p.faturamento))}</span>
+                  <span className="text-foreground tabular-nums shrink-0 ml-2">{formatByMetric(metric, metric === "volume" ? Number(p.volume) : Number(p.faturamento))}</span>
                 </div>
               ))}
             </div>
@@ -482,18 +492,22 @@ function ClienteTopRow({ cli, i, totalFat, filtrosCombinados }: {
   );
 }
 
-function ClientesTopBlock({ data, filtroLabel, filtrosCombinados }: {
+function ClientesTopBlock({ data, filtroLabel, filtrosCombinados, metric = "faturamento" }: {
   data: { razaoSocial: string; faturamento: number; volume: number; produtos: number; codParc?: number }[];
   filtroLabel?: string;
   filtrosCombinados?: Record<string, any>;
+  metric?: "faturamento" | "volume";
 }) {
-  const totalFat = data.reduce((s, r) => s + Number(r.faturamento), 0);
+  const ordenado = [...data].sort((a, b) =>
+    metric === "volume" ? Number(b.volume) - Number(a.volume) : Number(b.faturamento) - Number(a.faturamento)
+  );
+  const totalValor = data.reduce((s, r) => s + Number(metric === "volume" ? r.volume : r.faturamento), 0);
   return (
     <Card className={`border bg-card ${filtroLabel ? "border-[oklch(0.65_0.20_145_/_0.4)] ring-1 ring-[oklch(0.65_0.20_145_/_0.15)]" : "border-border"}`}>
       <CardHeader className="pb-2 pt-4 px-5">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="text-sm font-semibold text-foreground">
-            Top Clientes por Faturamento
+            {metric === "volume" ? "Top Clientes por Volume" : "Top Clientes por Faturamento"}
             <span className="text-[10px] text-muted-foreground font-normal ml-2">· seta para expandir produtos</span>
           </CardTitle>
           {filtroLabel && (
@@ -506,12 +520,249 @@ function ClientesTopBlock({ data, filtroLabel, filtrosCombinados }: {
       </CardHeader>
       <CardContent className="px-5 pb-4">
         <div className="space-y-1 overflow-y-auto max-h-72 pr-1">
-          {data.map((cli, i) => (
+          {ordenado.map((cli, i) => (
             <ClienteTopRow
               key={cli.codParc ?? i}
               cli={cli}
               i={i}
-              totalFat={totalFat}
+              totalValor={totalValor}
+              metric={metric}
+              filtrosCombinados={filtrosCombinados}
+            />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Linha de produto com expand/collapse de clientes (inverso de ClienteTopRow)
+function ProdutoTopRow({ prod, i, totalValor, metric, filtrosCombinados }: {
+  prod: { nomeProduto: string | null; faturamento: number; volume: number; clientes: number; codProduto?: number };
+  i: number;
+  totalValor: number;
+  metric: "faturamento" | "volume";
+  filtrosCombinados?: Record<string, any>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const { data: mix = [], isLoading: loadingMix } = useQuery({
+    queryKey: ["dashboard-original-produto-mix", prod.codProduto, filtrosCombinados],
+    queryFn: () => getDashboardOriginalProdutoMix(prod.codProduto!, filtrosCombinados as DashboardOriginalFiltros),
+    enabled: expanded && !!prod.codProduto,
+  });
+  const valor = metric === "volume" ? Number(prod.volume) : Number(prod.faturamento);
+  const pct = totalValor > 0 ? (valor / totalValor) * 100 : 0;
+  const color = CLI_COLORS[i % CLI_COLORS.length];
+  const label = prod.nomeProduto || "Produto";
+  const mixOrdenado = [...mix].sort((a: any, b: any) =>
+    metric === "volume" ? Number(b.volume) - Number(a.volume) : Number(b.faturamento) - Number(a.faturamento)
+  );
+  return (
+    <div className="rounded-lg border border-transparent hover:border-border/40 transition-all duration-150">
+      <div className="space-y-1 px-1.5 py-0.5">
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+              title={expanded ? "Recolher clientes" : "Expandir clientes"}
+            >
+              {expanded
+                ? <ChevronDown className="w-3 h-3" />
+                : <ChevronRight className="w-3 h-3" />}
+            </button>
+            <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+            <span
+              className="font-medium text-foreground truncate max-w-[320px]"
+              title={label}
+            >{label}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 ml-2">
+            <span className="font-semibold text-foreground tabular-nums">{formatByMetric(metric, valor)}</span>
+            <span className="text-[11px] font-bold tabular-nums w-9 text-right" style={{ color }}>{pct.toFixed(1)}%</span>
+          </div>
+        </div>
+        <div className="h-1 rounded-full bg-muted overflow-hidden ml-5">
+          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color }} />
+        </div>
+      </div>
+      {/* Sublinhas de clientes */}
+      {expanded && (
+        <div className="ml-7 mr-2 mb-1.5 mt-0.5 pl-2 border-l-2 border-border">
+          {loadingMix ? (
+            <p className="text-[11px] text-muted-foreground py-1">Carregando...</p>
+          ) : !mixOrdenado || mixOrdenado.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground py-1">Nenhum cliente encontrado</p>
+          ) : (
+            <div className="space-y-0.5 py-0.5">
+              {mixOrdenado.map((c: any, j: number) => (
+                <div key={j} className="flex items-center justify-between text-[11px] py-0.5">
+                  <span className="text-muted-foreground truncate max-w-[160px]" title={c.razaoSocial ?? "-"}>{c.razaoSocial ?? "-"}</span>
+                  <span className="text-foreground tabular-nums shrink-0 ml-2">{formatByMetric(metric, metric === "volume" ? Number(c.volume) : Number(c.faturamento))}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProdutosTopBlock({ data, filtroLabel, filtrosCombinados, metric = "faturamento" }: {
+  data: { nomeProduto: string | null; faturamento: number; volume: number; clientes: number; codProduto?: number }[];
+  filtroLabel?: string;
+  filtrosCombinados?: Record<string, any>;
+  metric?: "faturamento" | "volume";
+}) {
+  const ordenado = [...data].sort((a, b) =>
+    metric === "volume" ? Number(b.volume) - Number(a.volume) : Number(b.faturamento) - Number(a.faturamento)
+  );
+  const totalValor = data.reduce((s, r) => s + Number(metric === "volume" ? r.volume : r.faturamento), 0);
+  return (
+    <Card className={`border bg-card ${filtroLabel ? "border-[oklch(0.65_0.20_145_/_0.4)] ring-1 ring-[oklch(0.65_0.20_145_/_0.15)]" : "border-border"}`}>
+      <CardHeader className="pb-2 pt-4 px-5">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="text-sm font-semibold text-foreground">
+            {metric === "volume" ? "Top Produtos por Volume" : "Top Produtos por Faturamento"}
+            <span className="text-[10px] text-muted-foreground font-normal ml-2">· seta para expandir clientes</span>
+          </CardTitle>
+          {filtroLabel && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border border-[oklch(0.65_0.20_145_/_0.4)] bg-[oklch(0.65_0.20_145_/_0.08)] text-[oklch(0.75_0.15_145)]">
+              <Filter className="w-2.5 h-2.5" />
+              {filtroLabel}
+            </span>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="px-5 pb-4">
+        <div className="space-y-1 overflow-y-auto max-h-72 pr-1">
+          {ordenado.map((prod, i) => (
+            <ProdutoTopRow
+              key={prod.codProduto ?? i}
+              prod={prod}
+              i={i}
+              totalValor={totalValor}
+              metric={metric}
+              filtrosCombinados={filtrosCombinados}
+            />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Linha de região com expand/collapse de estados (UF) — inverso de ClienteTopRow/ProdutoTopRow
+function RegiaoTopRow({ regiao, i, totalValor, metric, filtrosCombinados }: {
+  regiao: { regiao: string; faturamento: number; volume: number; clientes: number; estados: number };
+  i: number;
+  totalValor: number;
+  metric: "faturamento" | "volume";
+  filtrosCombinados?: Record<string, any>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const { data: mix = [], isLoading: loadingMix } = useQuery({
+    queryKey: ["dashboard-original-regiao-mix", regiao.regiao, filtrosCombinados],
+    queryFn: () => getDashboardOriginalRegiaoMix(regiao.regiao, filtrosCombinados as DashboardOriginalFiltros),
+    enabled: expanded && !!regiao.regiao,
+  });
+  const valor = metric === "volume" ? Number(regiao.volume) : Number(regiao.faturamento);
+  const pct = totalValor > 0 ? (valor / totalValor) * 100 : 0;
+  const color = CLI_COLORS[i % CLI_COLORS.length];
+  const label = regiao.regiao;
+  const mixOrdenado = [...mix].sort((a: any, b: any) =>
+    metric === "volume" ? Number(b.volume) - Number(a.volume) : Number(b.faturamento) - Number(a.faturamento)
+  );
+  return (
+    <div className="rounded-lg border border-transparent hover:border-border/40 transition-all duration-150">
+      <div className="space-y-1 px-1.5 py-0.5">
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+              title={expanded ? "Recolher estados" : "Expandir estados"}
+            >
+              {expanded
+                ? <ChevronDown className="w-3 h-3" />
+                : <ChevronRight className="w-3 h-3" />}
+            </button>
+            <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+            <span
+              className="font-medium text-foreground truncate max-w-[320px]"
+              title={label}
+            >{label}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 ml-2">
+            <span className="font-semibold text-foreground tabular-nums">{formatByMetric(metric, valor)}</span>
+            <span className="text-[11px] font-bold tabular-nums w-9 text-right" style={{ color }}>{pct.toFixed(1)}%</span>
+          </div>
+        </div>
+        <div className="h-1 rounded-full bg-muted overflow-hidden ml-5">
+          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color }} />
+        </div>
+      </div>
+      {/* Sublinhas de estados */}
+      {expanded && (
+        <div className="ml-7 mr-2 mb-1.5 mt-0.5 pl-2 border-l-2 border-border">
+          {loadingMix ? (
+            <p className="text-[11px] text-muted-foreground py-1">Carregando...</p>
+          ) : !mixOrdenado || mixOrdenado.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground py-1">Nenhum estado encontrado</p>
+          ) : (
+            <div className="space-y-0.5 py-0.5">
+              {mixOrdenado.map((e: any, j: number) => (
+                <div key={j} className="flex items-center justify-between text-[11px] py-0.5">
+                  <span className="text-muted-foreground truncate max-w-[180px]" title={e.nomeEstado ?? e.uf ?? "-"}>
+                    {e.nomeEstado ?? "-"} <span className="text-muted-foreground/70">({e.uf})</span>
+                  </span>
+                  <span className="text-foreground tabular-nums shrink-0 ml-2">{formatByMetric(metric, metric === "volume" ? Number(e.volume) : Number(e.faturamento))}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RegioesTopBlock({ data, filtroLabel, filtrosCombinados, metric = "faturamento" }: {
+  data: { regiao: string; faturamento: number; volume: number; clientes: number; estados: number }[];
+  filtroLabel?: string;
+  filtrosCombinados?: Record<string, any>;
+  metric?: "faturamento" | "volume";
+}) {
+  const ordenado = [...data].sort((a, b) =>
+    metric === "volume" ? Number(b.volume) - Number(a.volume) : Number(b.faturamento) - Number(a.faturamento)
+  );
+  const totalValor = data.reduce((s, r) => s + Number(metric === "volume" ? r.volume : r.faturamento), 0);
+  return (
+    <Card className={`border bg-card ${filtroLabel ? "border-[oklch(0.65_0.20_145_/_0.4)] ring-1 ring-[oklch(0.65_0.20_145_/_0.15)]" : "border-border"}`}>
+      <CardHeader className="pb-2 pt-4 px-5">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="text-sm font-semibold text-foreground">
+            {metric === "volume" ? "Volume por Região" : "Faturamento por Região"}
+            <span className="text-[10px] text-muted-foreground font-normal ml-2">· seta para expandir estados</span>
+          </CardTitle>
+          {filtroLabel && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border border-[oklch(0.65_0.20_145_/_0.4)] bg-[oklch(0.65_0.20_145_/_0.08)] text-[oklch(0.75_0.15_145)]">
+              <Filter className="w-2.5 h-2.5" />
+              {filtroLabel}
+            </span>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="px-5 pb-4">
+        <div className="space-y-1 overflow-y-auto max-h-72 pr-1">
+          {ordenado.map((r, i) => (
+            <RegiaoTopRow
+              key={r.regiao ?? i}
+              regiao={r}
+              i={i}
+              totalValor={totalValor}
+              metric={metric}
               filtrosCombinados={filtrosCombinados}
             />
           ))}
@@ -527,6 +778,7 @@ export default function Dashboard() {
   const [drillDownTipo, setDrillDownTipo] = useState<string | null>(null);
   const [tipoReceitaFiltro, setTipoReceitaFiltro] = useState<string | null>(null);
   const [projetoFiltroLocal, setProjetoFiltroLocal] = useState<string | null>(null);
+  const [evolucaoView, setEvolucaoView] = useState<"faturamento" | "volume">("faturamento");
 
   // Filtros combinados: inclui tipoReceita e projeto local quando selecionados
   const filtrosCombinados = useMemo(
@@ -550,6 +802,8 @@ export default function Dashboard() {
   const segmentosData = resumo?.segmentos ?? [];
   const projetosData = resumo?.projetos ?? [];
   const clientesTopData = resumo?.clientesTop ?? [];
+  const produtosTopData = resumo?.produtosTop ?? [];
+  const regioesTopData = resumo?.regioesTop ?? [];
   const evolucaoAnt = resumo?.evolucaoMensalAnoAnterior ?? [];
   const kpisAnt = resumo?.kpisAnoAnterior;
   const orcamentoKpis = resumo?.orcamentoKpis;
@@ -575,22 +829,53 @@ export default function Dashboard() {
     const vf = Number(e.vendaFirme);
     const fc = Number(e.forecast);
     const np = Number(e.novoProjeto);
+    const volume = Number(e.volume);
+    const faturamento = Number(e.faturamento);
     const ant = antMap.get(e.mes ?? "");
     return {
       ...e,
       mesLabel: formatMes(e.mes ?? ""),
-      faturamento: Number(e.faturamento),
-      volume: Number(e.volume),
+      faturamento,
+      volume,
       vendaFirme: vf,
       forecast: fc,
       novoProjeto: np,
       total: vf + fc + np,
+      volumeVendaFirme: Number(e.volumeVendaFirme),
+      volumeForecast: Number(e.volumeForecast),
+      volumeNovoProjeto: Number(e.volumeNovoProjeto),
       fatAnt: ant?.fatAnt ?? null,
       volAnt: ant?.volAnt ?? null,
       fatOrc: orcMap.get(e.mes ?? "")?.fatOrc ?? null,
       volOrc: orcMap.get(e.mes ?? "")?.volOrc ?? null,
     };
   });
+
+  const evolucaoConfig = useMemo(() => (
+    evolucaoView === "faturamento"
+      ? {
+          title: "Evolução Mensal de Faturamento",
+          novoProjetoKey: "novoProjeto" as const,
+          forecastKey: "forecast" as const,
+          vendaFirmeKey: "vendaFirme" as const,
+          totalKey: "total" as const,
+          antKey: "fatAnt" as const,
+          orcKey: "fatOrc" as const,
+          yTickFormatter: (v: number) => `R$${(v / 1000).toFixed(0)}k`,
+          totalLabelFormatter: (v: number) => (v > 0 ? Math.round(v / 1000).toLocaleString("pt-BR") : ""),
+        }
+      : {
+          title: "Evolução Mensal de Volume",
+          novoProjetoKey: "volumeNovoProjeto" as const,
+          forecastKey: "volumeForecast" as const,
+          vendaFirmeKey: "volumeVendaFirme" as const,
+          totalKey: "volume" as const,
+          antKey: "volAnt" as const,
+          orcKey: "volOrc" as const,
+          yTickFormatter: (v: number) => `${(v / 1000).toFixed(0)}t`,
+          totalLabelFormatter: (v: number) => (v > 0 ? `${(v / 1000).toFixed(1)}t` : ""),
+        }
+  ), [evolucaoView]);
 
   const TIPO_COLOR_MAP: Record<string, string> = {
     VENDA_FIRME:  COLORS.VENDA_FIRME,
@@ -876,13 +1161,28 @@ export default function Dashboard() {
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Evolução Mensal — clique em barra filtra pelo mês */}
+        {/* Evolução Mensal — clique em barra filtra pelo mês; toggle Faturamento/Volume */}
         <Card className="lg:col-span-2 border border-border bg-card">
           <CardHeader className="pb-2 pt-5 px-5">
-            <CardTitle className="text-sm font-semibold text-foreground">
-              Evolução Mensal de Faturamento
-              <span className="text-[10px] text-muted-foreground font-normal ml-2">· clique em um mês para filtrar</span>
-            </CardTitle>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <CardTitle className="text-sm font-semibold text-foreground">
+                {evolucaoConfig.title}
+                <span className="text-[10px] text-muted-foreground font-normal ml-2">· clique em um mês para filtrar</span>
+              </CardTitle>
+              <div className="flex items-center gap-1 bg-background border border-border rounded-lg p-0.5">
+                {(["faturamento", "volume"] as const).map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => setEvolucaoView(v)}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                      evolucaoView === v ? "bg-[oklch(0.65_0.20_145)] text-white" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {v === "faturamento" ? "Faturamento" : "Volume"}
+                  </button>
+                ))}
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="px-3 pb-4">
             {loadingEvolucao ? (
@@ -894,22 +1194,23 @@ export default function Dashboard() {
                 <ComposedChart data={evolucaoFormatada} margin={{ top: 5, right: 10, left: 0, bottom: 5 }} onClick={handleBarClick} style={{ cursor: "pointer" }} barCategoryGap="25%">
                   <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.22 0.008 265)" vertical={false} />
                   <XAxis dataKey="mesLabel" tick={{ fontSize: 11, fill: "oklch(0.52 0.012 265)" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "oklch(0.52 0.012 265)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip content={<CustomTooltip />} cursor={{ fill: "oklch(0.22 0.008 265 / 0.5)" }} />
+                  <YAxis yAxisId="main" tick={{ fontSize: 11, fill: "oklch(0.52 0.012 265)" }} axisLine={false} tickLine={false} tickFormatter={evolucaoConfig.yTickFormatter} />
+                  <Tooltip content={<CustomTooltip metric={evolucaoView} />} cursor={{ fill: "oklch(0.22 0.008 265 / 0.5)" }} />
                   <Legend wrapperStyle={{ fontSize: 12, color: "oklch(0.52 0.012 265)" }} />
-                  <Bar dataKey="novoProjeto" name="Novo Projeto" fill={COLOR_NOVO_PROJETO} stackId="fat" maxBarSize={48} />
-                  <Bar dataKey="forecast" name="Forecast" fill={COLOR_FORECAST} stackId="fat" maxBarSize={48} />
-                  <Bar dataKey="vendaFirme" name="Venda Firme" fill={COLOR_VENDA_FIRME} stackId="fat" radius={[4, 4, 0, 0]} maxBarSize={48}>
+                  <Bar yAxisId="main" dataKey={evolucaoConfig.novoProjetoKey} name="Novo Projeto" fill={COLOR_NOVO_PROJETO} stackId="fat" maxBarSize={48} />
+                  <Bar yAxisId="main" dataKey={evolucaoConfig.forecastKey} name="Forecast" fill={COLOR_FORECAST} stackId="fat" maxBarSize={48} />
+                  <Bar yAxisId="main" dataKey={evolucaoConfig.vendaFirmeKey} name="Venda Firme" fill={COLOR_VENDA_FIRME} stackId="fat" radius={[4, 4, 0, 0]} maxBarSize={48}>
                     <LabelList
-                      dataKey="total"
+                      dataKey={evolucaoConfig.totalKey}
                       position="top"
                       style={{ fontSize: 10, fill: "oklch(0.75 0.012 265)", fontWeight: 500 }}
-                      formatter={(v: number) => v > 0 ? Math.round(v / 1000).toLocaleString('pt-BR') : ""}
+                      formatter={evolucaoConfig.totalLabelFormatter}
                     />
                   </Bar>
                   {evolucaoAnt && evolucaoAnt.length > 0 && (
                     <Line
-                      dataKey="fatAnt"
+                      yAxisId="main"
+                      dataKey={evolucaoConfig.antKey}
                       name="Ano Anterior"
                       stroke="oklch(0.75 0.012 265)"
                       strokeWidth={1.5}
@@ -921,7 +1222,8 @@ export default function Dashboard() {
                   )}
                   {orcamentoMensal && orcamentoMensal.length > 0 && (
                     <Line
-                      dataKey="fatOrc"
+                      yAxisId="main"
+                      dataKey={evolucaoConfig.orcKey}
                       name="Orçamento"
                       stroke={COLOR_ORCAMENTO}
                       strokeWidth={2}
@@ -992,88 +1294,63 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Volume mensal + Segmentos lado a lado */}
-      {evolucaoFormatada.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Card className="lg:col-span-2 border border-border bg-card">
-            <CardHeader className="pb-2 pt-4 px-5">
-              <CardTitle className="text-sm font-semibold text-foreground">
-                Evolução de Volume (kg)
-                <span className="text-[10px] text-muted-foreground font-normal ml-2">· clique em uma barra para filtrar pelo mês</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-3 pb-3">
-              <ResponsiveContainer width="100%" height={220}>
-                <ComposedChart data={evolucaoFormatada} margin={{ top: 22, right: 10, left: 0, bottom: 5 }} onClick={handleBarClick} style={{ cursor: "pointer" }} barCategoryGap="25%">
-                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.22 0.008 265)" vertical={false} />
-                  <XAxis dataKey="mesLabel" tick={{ fontSize: 10, fill: "oklch(0.52 0.012 265)" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "oklch(0.52 0.012 265)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}t`} width={32} />
-                  <Tooltip
-                    formatter={(v: any, name: string) => [
-                      name === "Ano Anterior" ? formatKg(v) : formatKg(v),
-                      name,
-                    ]}
-                    contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 12, color: "#fff" }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#fff" }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 11, color: "oklch(0.52 0.012 265)" }} />
-                  <Bar dataKey="volume" name="Volume (kg)" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} maxBarSize={40}>
-                    <LabelList
-                      dataKey="volume"
-                      position="top"
-                      style={{ fontSize: 9, fill: "oklch(0.70 0.012 265)", fontWeight: 500 }}
-                      formatter={(v: number) => v > 0 ? `${(v / 1000).toFixed(1)}t` : ""}
-                    />
-                  </Bar>
-                  {evolucaoAnt && evolucaoAnt.length > 0 && (
-                    <Line
-                      dataKey="volAnt"
-                      name="Ano Anterior"
-                      stroke="oklch(0.75 0.012 265)"
-                      strokeWidth={1.5}
-                      strokeDasharray="5 4"
-                      dot={false}
-                      activeDot={{ r: 4, fill: "oklch(0.75 0.012 265)" }}
-                      connectNulls
-                    />
-                  )}
-                  {orcamentoMensal && orcamentoMensal.length > 0 && (
-                    <Line
-                      dataKey="volOrc"
-                      name="Orçamento"
-                      stroke={COLOR_ORCAMENTO}
-                      strokeWidth={2}
-                      strokeDasharray="6 3"
-                      dot={false}
-                      activeDot={{ r: 4, fill: COLOR_ORCAMENTO }}
-                      connectNulls
-                    />
-                  )}
-                </ComposedChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-          {clientesTopData && clientesTopData.length > 0 && (
-            <ClientesTopBlock
-              data={clientesTopData.map((c) => ({
-                razaoSocial: c.razaoSocial ?? "Cliente",
-                faturamento: Number(c.faturamento),
-                volume: Number(c.volume),
-                produtos: Number(c.produtos),
-                codParc: c.codParc ?? undefined,
-              }))}
-              filtroLabel={[
-                ...(filtros.projetos ?? (filtros.projeto ? [filtros.projeto] : [])),
-                ...(filtros.mercados ?? (filtros.mercado ? [filtros.mercado] : [])),
-                ...(filtros.vendedores ?? (filtros.vendedor ? [filtros.vendedor] : [])).map((v) => v.replace(/^\d+ - /, "")),
-                ...(filtros.gruposProduto ?? (filtros.grupoProduto ? [filtros.grupoProduto] : [])),
-                projetoFiltroLocal ?? "",
-                tipoReceitaFiltro ? tipoReceitaLabel(tipoReceitaFiltro) : "",
-              ].filter(Boolean).join(" · ") || undefined}
-              filtrosCombinados={filtrosCombinados}
-            />
-          )}
-        </div>
-      )}
+      {/* Top Clientes, Top Produtos e Faturamento por Região */}
+      {evolucaoFormatada.length > 0 && ((clientesTopData && clientesTopData.length > 0) || (produtosTopData && produtosTopData.length > 0) || (regioesTopData && regioesTopData.length > 0)) && (() => {
+        const filtroLabel = [
+          ...(filtros.projetos ?? (filtros.projeto ? [filtros.projeto] : [])),
+          ...(filtros.mercados ?? (filtros.mercado ? [filtros.mercado] : [])),
+          ...(filtros.vendedores ?? (filtros.vendedor ? [filtros.vendedor] : [])).map((v) => v.replace(/^\d+ - /, "")),
+          ...(filtros.gruposProduto ?? (filtros.grupoProduto ? [filtros.grupoProduto] : [])),
+          projetoFiltroLocal ?? "",
+          tipoReceitaFiltro ? tipoReceitaLabel(tipoReceitaFiltro) : "",
+        ].filter(Boolean).join(" · ") || undefined;
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {clientesTopData && clientesTopData.length > 0 && (
+              <ClientesTopBlock
+                data={clientesTopData.map((c) => ({
+                  razaoSocial: c.razaoSocial ?? "Cliente",
+                  faturamento: Number(c.faturamento),
+                  volume: Number(c.volume),
+                  produtos: Number(c.produtos),
+                  codParc: c.codParc ?? undefined,
+                }))}
+                filtroLabel={filtroLabel}
+                filtrosCombinados={filtrosCombinados}
+                metric={evolucaoView}
+              />
+            )}
+            {produtosTopData && produtosTopData.length > 0 && (
+              <ProdutosTopBlock
+                data={produtosTopData.map((p) => ({
+                  nomeProduto: p.nomeProduto ?? "Produto",
+                  faturamento: Number(p.faturamento),
+                  volume: Number(p.volume),
+                  clientes: Number(p.clientes),
+                  codProduto: p.codProduto ?? undefined,
+                }))}
+                filtroLabel={filtroLabel}
+                filtrosCombinados={filtrosCombinados}
+                metric={evolucaoView}
+              />
+            )}
+            {regioesTopData && regioesTopData.length > 0 && (
+              <RegioesTopBlock
+                data={regioesTopData.map((r) => ({
+                  regiao: r.regiao,
+                  faturamento: Number(r.faturamento),
+                  volume: Number(r.volume),
+                  clientes: Number(r.clientes),
+                  estados: Number(r.estados),
+                }))}
+                filtroLabel={filtroLabel}
+                filtrosCombinados={filtrosCombinados}
+                metric={evolucaoView}
+              />
+            )}
+          </div>
+        );
+      })()}
 
       <DrillDownModal
         open={!!drillDownTipo}
