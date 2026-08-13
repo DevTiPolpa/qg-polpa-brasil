@@ -31,6 +31,13 @@ export function formatKg(value: number | string | null | undefined): string {
   return `${n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`
 }
 
+export function formatData(yyyyMmDd: string | null | undefined): string {
+  if (!yyyyMmDd) return '-'
+  const [year, month, day] = yyyyMmDd.split('-')
+  if (!year || !month || !day) return yyyyMmDd
+  return `${day}/${month}/${year}`
+}
+
 const TIPO_LABELS: Record<string, string> = {
   VENDA_FIRME: 'Venda Firme',
   FORECAST: 'Forecast',

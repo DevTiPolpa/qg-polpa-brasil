@@ -1595,3 +1595,81 @@ export async function buscarGeracaoListasEmpresa(payload: { nome: string; cnpj?:
   if (payload.cnpj) params.set('cnpj', payload.cnpj)
   return apiRequest(`/api/geracao-listas/buscar?${params.toString()}`)
 }
+
+// ============================================================
+// Movimentação de Clientes e Produtos
+// ============================================================
+
+export type MovimentacaoClienteAberto = {
+  codParc: number
+  razaoSocial: string
+  faturamento: number
+  pedidos: number
+  primeiraCompra: string | null
+  ultimaCompra: string | null
+}
+
+export type MovimentacaoClientePerdido = {
+  codParc: number
+  razaoSocial: string
+  faturamento: number
+  pedidos: number
+  ultimaCompra: string | null
+  diasSemComprar: number | null
+}
+
+export type MovimentacaoClientesResponse = {
+  ano: number
+  anoAnterior: number
+  abertos: MovimentacaoClienteAberto[]
+  perdidos: MovimentacaoClientePerdido[]
+}
+
+export type MovimentacaoProduto = {
+  codProduto: number
+  nomeProduto: string
+  grupoProduto: string | null
+  faturamento: number
+  volume: number
+  clientes: number
+  primeiraVenda: string | null
+  ultimaVenda: string | null
+}
+
+export type MovimentacaoProdutosResponse = {
+  ano: number
+  anoAnterior: number
+  lancados: MovimentacaoProduto[]
+  descontinuados: MovimentacaoProduto[]
+}
+
+export async function getMovimentacaoClientes(ano: number): Promise<MovimentacaoClientesResponse> {
+  return apiRequest<MovimentacaoClientesResponse>(`/api/movimentacao/clientes?ano=${ano}`)
+}
+
+export async function getMovimentacaoProdutos(ano: number): Promise<MovimentacaoProdutosResponse> {
+  return apiRequest<MovimentacaoProdutosResponse>(`/api/movimentacao/produtos?ano=${ano}`)
+}
+
+export type MovimentacaoClienteProduto = {
+  codProduto: number
+  nomeProduto: string
+  grupoProduto: string | null
+  faturamento: number
+  volume: number
+}
+
+export type MovimentacaoProdutoCliente = {
+  codParc: number
+  razaoSocial: string
+  faturamento: number
+  volume: number
+}
+
+export async function getMovimentacaoClienteProdutos(codParc: number, ano: number): Promise<MovimentacaoClienteProduto[]> {
+  return apiRequest<MovimentacaoClienteProduto[]>(`/api/movimentacao/clientes/${codParc}/produtos?ano=${ano}`)
+}
+
+export async function getMovimentacaoProdutoClientes(codProduto: number, ano: number): Promise<MovimentacaoProdutoCliente[]> {
+  return apiRequest<MovimentacaoProdutoCliente[]>(`/api/movimentacao/produtos/${codProduto}/clientes?ano=${ano}`)
+}

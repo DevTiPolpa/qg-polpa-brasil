@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLocation } from 'wouter'
 import {
   LayoutDashboard, Users, UserCog, LogOut,
-  ChevronLeft, ChevronRight, FolderOpen, BarChart2, Target, Menu, X, MessageSquare, History, Gauge, ListChecks,
+  ChevronLeft, ChevronRight, FolderOpen, BarChart2, Target, Menu, X, MessageSquare, History, Gauge, ListChecks, ArrowLeftRight,
 } from 'lucide-react'
 import { logout } from '../lib/api'
 
@@ -17,6 +17,7 @@ const menuGroups = [
       { icon: Users,       label: 'Por Vendedor',       path: '/vendedores' },
       { icon: FolderOpen,  label: 'Novos Projetos',     path: '/projetos' },
       { icon: Users,       label: 'Histórico Clientes', path: '/historico-clientes' },
+      { icon: ArrowLeftRight, label: 'Movimentação de Clientes e Produtos', path: '/movimentacao' },
       { icon: History,     label: 'Comparativo Semanal', path: '/snapshot' },
       { icon: BarChart2,   label: 'Recorrentes R x O', path: '/recorrentes' },
     ],
