@@ -1607,6 +1607,7 @@ export type MovimentacaoClienteAberto = {
   pedidos: number
   primeiraCompra: string | null
   ultimaCompra: string | null
+  vendedorUltimaCompra: string | null
 }
 
 export type MovimentacaoClientePerdido = {
@@ -1616,6 +1617,7 @@ export type MovimentacaoClientePerdido = {
   pedidos: number
   ultimaCompra: string | null
   diasSemComprar: number | null
+  vendedorUltimaCompra: string | null
 }
 
 export type MovimentacaoClientesResponse = {
@@ -1643,12 +1645,18 @@ export type MovimentacaoProdutosResponse = {
   descontinuados: MovimentacaoProduto[]
 }
 
-export async function getMovimentacaoClientes(ano: number): Promise<MovimentacaoClientesResponse> {
-  return apiRequest<MovimentacaoClientesResponse>(`/api/movimentacao/clientes?ano=${ano}`)
+export async function getMovimentacaoClientes(ano: number, mercados?: string[], vendedores?: string[]): Promise<MovimentacaoClientesResponse> {
+  const params = new URLSearchParams({ ano: String(ano) })
+  appendArrayParam(params, 'mercados', mercados)
+  appendArrayParam(params, 'vendedores', vendedores)
+  return apiRequest<MovimentacaoClientesResponse>(`/api/movimentacao/clientes?${params.toString()}`)
 }
 
-export async function getMovimentacaoProdutos(ano: number): Promise<MovimentacaoProdutosResponse> {
-  return apiRequest<MovimentacaoProdutosResponse>(`/api/movimentacao/produtos?ano=${ano}`)
+export async function getMovimentacaoProdutos(ano: number, mercados?: string[], vendedores?: string[]): Promise<MovimentacaoProdutosResponse> {
+  const params = new URLSearchParams({ ano: String(ano) })
+  appendArrayParam(params, 'mercados', mercados)
+  appendArrayParam(params, 'vendedores', vendedores)
+  return apiRequest<MovimentacaoProdutosResponse>(`/api/movimentacao/produtos?${params.toString()}`)
 }
 
 export type MovimentacaoClienteProduto = {
@@ -1666,10 +1674,16 @@ export type MovimentacaoProdutoCliente = {
   volume: number
 }
 
-export async function getMovimentacaoClienteProdutos(codParc: number, ano: number): Promise<MovimentacaoClienteProduto[]> {
-  return apiRequest<MovimentacaoClienteProduto[]>(`/api/movimentacao/clientes/${codParc}/produtos?ano=${ano}`)
+export async function getMovimentacaoClienteProdutos(codParc: number, ano: number, mercados?: string[], vendedores?: string[]): Promise<MovimentacaoClienteProduto[]> {
+  const params = new URLSearchParams({ ano: String(ano) })
+  appendArrayParam(params, 'mercados', mercados)
+  appendArrayParam(params, 'vendedores', vendedores)
+  return apiRequest<MovimentacaoClienteProduto[]>(`/api/movimentacao/clientes/${codParc}/produtos?${params.toString()}`)
 }
 
-export async function getMovimentacaoProdutoClientes(codProduto: number, ano: number): Promise<MovimentacaoProdutoCliente[]> {
-  return apiRequest<MovimentacaoProdutoCliente[]>(`/api/movimentacao/produtos/${codProduto}/clientes?ano=${ano}`)
+export async function getMovimentacaoProdutoClientes(codProduto: number, ano: number, mercados?: string[], vendedores?: string[]): Promise<MovimentacaoProdutoCliente[]> {
+  const params = new URLSearchParams({ ano: String(ano) })
+  appendArrayParam(params, 'mercados', mercados)
+  appendArrayParam(params, 'vendedores', vendedores)
+  return apiRequest<MovimentacaoProdutoCliente[]>(`/api/movimentacao/produtos/${codProduto}/clientes?${params.toString()}`)
 }

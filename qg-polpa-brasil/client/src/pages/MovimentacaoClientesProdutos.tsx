@@ -1,10 +1,11 @@
-import { useState, type ElementType } from "react";
+import { useMemo, useState, type ElementType } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   getMovimentacaoClientes,
   getMovimentacaoProdutos,
   getMovimentacaoClienteProdutos,
   getMovimentacaoProdutoClientes,
+  getDashboardOriginalFiltrosDisponiveis,
   type MovimentacaoClienteAberto,
   type MovimentacaoClientePerdido,
   type MovimentacaoProduto,
@@ -12,10 +13,16 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs } from "@/components/ui/tabs";
+import MultiSelect from "@/components/MultiSelect";
 import { formatCurrency, formatKg, formatNumber, formatData } from "@/lib/utils";
 import { ArrowLeftRight, UserPlus, UserMinus, PackagePlus, PackageMinus, AlertTriangle, ChevronRight, ChevronDown } from "lucide-react";
 
 const ANOS = ["2024", "2025", "2026", "2027"];
+
+// 20 linhas visíveis (linha compactada ~36px + cabeçalho 36px: 20*36 + 36 = 756px), o resto rola.
+// [&_td]/[&_th]:whitespace-nowrap garante que nenhuma célula quebre texto em uma segunda linha
+// (colunas de texto livre usam truncate + max-w para cortar com "..." em vez de quebrar).
+const ALTURA_TABELA = "max-h-[756px] overflow-y-auto [&_td]:py-2 [&_th]:h-9 [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap";
 
 type AbaValue = "abertos" | "perdidos" | "lancados" | "descontinuados";
 
@@ -33,7 +40,7 @@ function KpiCard({ label, value, icon: Icon, iconClass, loading }: {
     <Card className="border border-border bg-card">
       <CardContent className="p-4">
         <div className="flex items-center justify-between gap-2 mb-3">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest leading-tight">{label}</p>
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest leading-tight truncate" title={label}>{label}</p>
           <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}>
             <Icon className="w-3.5 h-3.5" />
           </div>
@@ -87,11 +94,20 @@ function BotaoExpandir({ expanded }: { expanded: boolean }) {
     : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />;
 }
 
+// Célula da linha de total, fixada no rodapé visível da tabela (sticky bottom-0)
+function CelulaTotal({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
+  return (
+    <TableCell className={`sticky bottom-0 z-10 bg-card border-t border-white/10 font-semibold text-foreground tabular-nums ${className}`}>
+      {children}
+    </TableCell>
+  );
+}
+
 // Sublinha expandida: produtos comprados por um cliente naquele ano específico
-function ProdutosDoCliente({ codParc, ano }: { codParc: number; ano: number }) {
+function ProdutosDoCliente({ codParc, ano, mercados, vendedores }: { codParc: number; ano: number; mercados?: string[]; vendedores?: string[] }) {
   const { data: produtos = [], isLoading, isError } = useQuery({
-    queryKey: ["movimentacao-cliente-produtos", codParc, ano],
-    queryFn: () => getMovimentacaoClienteProdutos(codParc, ano),
+    queryKey: ["movimentacao-cliente-produtos", codParc, ano, mercados, vendedores],
+    queryFn: () => getMovimentacaoClienteProdutos(codParc, ano, mercados, vendedores),
   });
 
   if (isLoading) return <p className="text-xs text-muted-foreground py-2 px-2">Carregando produtos...</p>;
@@ -117,10 +133,10 @@ function ProdutosDoCliente({ codParc, ano }: { codParc: number; ano: number }) {
 }
 
 // Sublinha expandida: clientes que compraram um produto naquele ano específico
-function ClientesDoProduto({ codProduto, ano }: { codProduto: number; ano: number }) {
+function ClientesDoProduto({ codProduto, ano, mercados, vendedores }: { codProduto: number; ano: number; mercados?: string[]; vendedores?: string[] }) {
   const { data: clientes = [], isLoading, isError } = useQuery({
-    queryKey: ["movimentacao-produto-clientes", codProduto, ano],
-    queryFn: () => getMovimentacaoProdutoClientes(codProduto, ano),
+    queryKey: ["movimentacao-produto-clientes", codProduto, ano, mercados, vendedores],
+    queryFn: () => getMovimentacaoProdutoClientes(codProduto, ano, mercados, vendedores),
   });
 
   if (isLoading) return <p className="text-xs text-muted-foreground py-2 px-2">Carregando clientes...</p>;
@@ -142,24 +158,51 @@ function ClientesDoProduto({ codProduto, ano }: { codProduto: number; ano: numbe
   );
 }
 
-function LinhaClienteAberto({ cliente, ano }: { cliente: MovimentacaoClienteAberto; ano: number }) {
+function LinhaClienteAberto({ cliente, ano, mercados, vendedores }: { cliente: MovimentacaoClienteAberto; ano: number; mercados?: string[]; vendedores?: string[] }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <>
       <TableRow className="cursor-pointer" onClick={() => setExpanded((v) => !v)}>
         <TableCell className="w-8"><BotaoExpandir expanded={expanded} /></TableCell>
         <TableCell className="text-muted-foreground tabular-nums">{cliente.codParc}</TableCell>
-        <TableCell className="font-medium text-foreground">{cliente.razaoSocial}</TableCell>
+        <TableCell className="font-medium text-foreground max-w-[260px] truncate" title={cliente.razaoSocial}>{cliente.razaoSocial}</TableCell>
         <TableCell className="text-right font-semibold text-foreground tabular-nums">{formatCurrency(cliente.faturamento)}</TableCell>
         <TableCell className="text-right tabular-nums">{formatNumber(cliente.pedidos)}</TableCell>
         <TableCell className="text-muted-foreground">{formatData(cliente.primeiraCompra)}</TableCell>
         <TableCell className="text-muted-foreground">{formatData(cliente.ultimaCompra)}</TableCell>
+        <TableCell className="text-muted-foreground max-w-[160px] truncate" title={cliente.vendedorUltimaCompra ?? undefined}>{cliente.vendedorUltimaCompra ?? "-"}</TableCell>
+      </TableRow>
+      {expanded && (
+        <TableRow>
+          <TableCell colSpan={8} className="bg-background/40 py-0">
+            <div className="pl-9 pr-2">
+              <ProdutosDoCliente codParc={cliente.codParc} ano={ano} mercados={mercados} vendedores={vendedores} />
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+}
+
+function LinhaClientePerdido({ cliente, ano, mercados, vendedores }: { cliente: MovimentacaoClientePerdido; ano: number; mercados?: string[]; vendedores?: string[] }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <>
+      <TableRow className="cursor-pointer" onClick={() => setExpanded((v) => !v)}>
+        <TableCell className="w-8"><BotaoExpandir expanded={expanded} /></TableCell>
+        <TableCell className="text-muted-foreground tabular-nums">{cliente.codParc}</TableCell>
+        <TableCell className="font-medium text-foreground max-w-[260px] truncate" title={cliente.razaoSocial}>{cliente.razaoSocial}</TableCell>
+        <TableCell className="text-right font-semibold text-foreground tabular-nums">{formatCurrency(cliente.faturamento)}</TableCell>
+        <TableCell className="text-right tabular-nums">{formatNumber(cliente.pedidos)}</TableCell>
+        <TableCell className="text-muted-foreground">{formatData(cliente.ultimaCompra)}</TableCell>
+        <TableCell className="text-muted-foreground max-w-[160px] truncate" title={cliente.vendedorUltimaCompra ?? undefined}>{cliente.vendedorUltimaCompra ?? "-"}</TableCell>
       </TableRow>
       {expanded && (
         <TableRow>
           <TableCell colSpan={7} className="bg-background/40 py-0">
             <div className="pl-9 pr-2">
-              <ProdutosDoCliente codParc={cliente.codParc} ano={ano} />
+              <ProdutosDoCliente codParc={cliente.codParc} ano={ano} mercados={mercados} vendedores={vendedores} />
             </div>
           </TableCell>
         </TableRow>
@@ -168,40 +211,15 @@ function LinhaClienteAberto({ cliente, ano }: { cliente: MovimentacaoClienteAber
   );
 }
 
-function LinhaClientePerdido({ cliente, ano }: { cliente: MovimentacaoClientePerdido; ano: number }) {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <>
-      <TableRow className="cursor-pointer" onClick={() => setExpanded((v) => !v)}>
-        <TableCell className="w-8"><BotaoExpandir expanded={expanded} /></TableCell>
-        <TableCell className="text-muted-foreground tabular-nums">{cliente.codParc}</TableCell>
-        <TableCell className="font-medium text-foreground">{cliente.razaoSocial}</TableCell>
-        <TableCell className="text-right font-semibold text-foreground tabular-nums">{formatCurrency(cliente.faturamento)}</TableCell>
-        <TableCell className="text-right tabular-nums">{formatNumber(cliente.pedidos)}</TableCell>
-        <TableCell className="text-muted-foreground">{formatData(cliente.ultimaCompra)}</TableCell>
-      </TableRow>
-      {expanded && (
-        <TableRow>
-          <TableCell colSpan={6} className="bg-background/40 py-0">
-            <div className="pl-9 pr-2">
-              <ProdutosDoCliente codParc={cliente.codParc} ano={ano} />
-            </div>
-          </TableCell>
-        </TableRow>
-      )}
-    </>
-  );
-}
-
-function LinhaProduto({ produto, ano }: { produto: MovimentacaoProduto; ano: number }) {
+function LinhaProduto({ produto, ano, mercados, vendedores }: { produto: MovimentacaoProduto; ano: number; mercados?: string[]; vendedores?: string[] }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <>
       <TableRow className="cursor-pointer" onClick={() => setExpanded((v) => !v)}>
         <TableCell className="w-8"><BotaoExpandir expanded={expanded} /></TableCell>
         <TableCell className="text-muted-foreground tabular-nums">{produto.codProduto}</TableCell>
-        <TableCell className="font-medium text-foreground">{produto.nomeProduto}</TableCell>
-        <TableCell className="text-muted-foreground">{produto.grupoProduto ?? "-"}</TableCell>
+        <TableCell className="font-medium text-foreground max-w-[260px] truncate" title={produto.nomeProduto}>{produto.nomeProduto}</TableCell>
+        <TableCell className="text-muted-foreground max-w-[140px] truncate" title={produto.grupoProduto ?? undefined}>{produto.grupoProduto ?? "-"}</TableCell>
         <TableCell className="text-right tabular-nums">{formatKg(produto.volume)}</TableCell>
         <TableCell className="text-right font-semibold text-foreground tabular-nums">{formatCurrency(produto.faturamento)}</TableCell>
         <TableCell className="text-right tabular-nums">{formatNumber(produto.clientes)}</TableCell>
@@ -212,7 +230,7 @@ function LinhaProduto({ produto, ano }: { produto: MovimentacaoProduto; ano: num
         <TableRow>
           <TableCell colSpan={9} className="bg-background/40 py-0">
             <div className="pl-9 pr-2">
-              <ClientesDoProduto codProduto={produto.codProduto} ano={ano} />
+              <ClientesDoProduto codProduto={produto.codProduto} ano={ano} mercados={mercados} vendedores={vendedores} />
             </div>
           </TableCell>
         </TableRow>
@@ -223,19 +241,31 @@ function LinhaProduto({ produto, ano }: { produto: MovimentacaoProduto; ano: num
 
 export default function MovimentacaoClientesProdutos() {
   const [ano, setAno] = useState("2026");
+  const [mercadosSelecionados, setMercadosSelecionados] = useState<string[]>([]);
+  const [vendedoresSelecionados, setVendedoresSelecionados] = useState<string[]>([]);
   const [aba, setAba] = useState<AbaValue>("abertos");
   const anoNum = Number(ano);
   const anoAnterior = anoNum - 1;
+  const mercadosFiltro = mercadosSelecionados.length ? mercadosSelecionados : undefined;
+  const vendedoresFiltro = vendedoresSelecionados.length ? vendedoresSelecionados : undefined;
+
+  const { data: filtrosDisponiveis } = useQuery({
+    queryKey: ["dashboard-original-filtros-disponiveis"],
+    queryFn: () => getDashboardOriginalFiltrosDisponiveis(),
+    staleTime: 5 * 60_000,
+  });
+  const mercadosDisponiveis = filtrosDisponiveis?.mercados ?? [];
+  const vendedoresDisponiveis = filtrosDisponiveis?.vendedores ?? [];
 
   const { data: clientes, isLoading: loadingClientes, isError: erroClientes } = useQuery({
-    queryKey: ["movimentacao-clientes", anoNum],
-    queryFn: () => getMovimentacaoClientes(anoNum),
+    queryKey: ["movimentacao-clientes", anoNum, mercadosFiltro, vendedoresFiltro],
+    queryFn: () => getMovimentacaoClientes(anoNum, mercadosFiltro, vendedoresFiltro),
     staleTime: 60_000,
   });
 
   const { data: produtos, isLoading: loadingProdutos, isError: erroProdutos } = useQuery({
-    queryKey: ["movimentacao-produtos", anoNum],
-    queryFn: () => getMovimentacaoProdutos(anoNum),
+    queryKey: ["movimentacao-produtos", anoNum, mercadosFiltro, vendedoresFiltro],
+    queryFn: () => getMovimentacaoProdutos(anoNum, mercadosFiltro, vendedoresFiltro),
     staleTime: 60_000,
   });
 
@@ -243,6 +273,26 @@ export default function MovimentacaoClientesProdutos() {
   const perdidos = clientes?.perdidos ?? [];
   const lancados = produtos?.lancados ?? [];
   const descontinuados = produtos?.descontinuados ?? [];
+
+  const totalAbertos = useMemo(() => ({
+    faturamento: abertos.reduce((s, c) => s + c.faturamento, 0),
+    pedidos: abertos.reduce((s, c) => s + c.pedidos, 0),
+  }), [abertos]);
+
+  const totalPerdidos = useMemo(() => ({
+    faturamento: perdidos.reduce((s, c) => s + c.faturamento, 0),
+    pedidos: perdidos.reduce((s, c) => s + c.pedidos, 0),
+  }), [perdidos]);
+
+  const totalLancados = useMemo(() => ({
+    volume: lancados.reduce((s, p) => s + p.volume, 0),
+    faturamento: lancados.reduce((s, p) => s + p.faturamento, 0),
+  }), [lancados]);
+
+  const totalDescontinuados = useMemo(() => ({
+    volume: descontinuados.reduce((s, p) => s + p.volume, 0),
+    faturamento: descontinuados.reduce((s, p) => s + p.faturamento, 0),
+  }), [descontinuados]);
 
   return (
     <div className="space-y-4">
@@ -259,21 +309,45 @@ export default function MovimentacaoClientesProdutos() {
         </div>
       </div>
 
-      {/* Filtro: apenas Ano */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Ano</span>
-        <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-0.5">
-          {ANOS.map((a) => (
-            <button
-              key={a}
-              onClick={() => setAno(a)}
-              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                ano === a ? "bg-[oklch(0.65_0.20_145)] text-white" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {a}
-            </button>
-          ))}
+      {/* Filtros: Ano, Mercado de Vendas e Vendedor (Mercado e Vendedor aceitam múltipla seleção) */}
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Ano</span>
+          <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-0.5">
+            {ANOS.map((a) => (
+              <button
+                key={a}
+                onClick={() => setAno(a)}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  ano === a ? "bg-[oklch(0.65_0.20_145)] text-white" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {a}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Mercado de Vendas</span>
+          <MultiSelect
+            options={mercadosDisponiveis}
+            selected={mercadosSelecionados}
+            onChange={setMercadosSelecionados}
+            placeholder="Todos os mercados"
+            className="w-56"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Vendedor</span>
+          <MultiSelect
+            options={vendedoresDisponiveis}
+            selected={vendedoresSelecionados}
+            onChange={setVendedoresSelecionados}
+            placeholder="Todos os vendedores"
+            className="w-56"
+          />
         </div>
       </div>
 
@@ -288,98 +362,157 @@ export default function MovimentacaoClientesProdutos() {
       {/* Abas */}
       <Tabs tabs={TABS} value={aba} onChange={setAba} />
 
-      {/* Tabela da aba ativa */}
+      {/* Tabela da aba ativa — altura de ~20 linhas, restante rola; total fixado no rodapé */}
       <Card className="border border-border bg-card overflow-hidden">
         <CardContent className="p-0">
           {aba === "abertos" && (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8" />
-                  <TableHead>Código</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead className="text-right">Faturamento {ano}</TableHead>
-                  <TableHead className="text-right">Pedidos</TableHead>
-                  <TableHead>1ª Compra</TableHead>
-                  <TableHead>Última Compra</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <LinhaEstado loading={loadingClientes} error={erroClientes} vazio={!loadingClientes && !erroClientes && abertos.length === 0} colSpan={7} />
-                {!loadingClientes && !erroClientes && abertos.map((c) => (
-                  <LinhaClienteAberto key={c.codParc} cliente={c} ano={anoNum} />
-                ))}
-              </TableBody>
-            </Table>
+            <div className={ALTURA_TABELA}>
+              <Table>
+                <TableHeader className="sticky top-0 z-20 bg-card">
+                  <TableRow>
+                    <TableHead className="w-8" />
+                    <TableHead>Código</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead className="text-right">Fat {ano}</TableHead>
+                    <TableHead className="text-right">Pedidos</TableHead>
+                    <TableHead>1ª Compra</TableHead>
+                    <TableHead>Última Compra</TableHead>
+                    <TableHead>Vendedor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <LinhaEstado loading={loadingClientes} error={erroClientes} vazio={!loadingClientes && !erroClientes && abertos.length === 0} colSpan={8} />
+                  {!loadingClientes && !erroClientes && abertos.map((c) => (
+                    <LinhaClienteAberto key={c.codParc} cliente={c} ano={anoNum} mercados={mercadosFiltro} vendedores={vendedoresFiltro} />
+                  ))}
+                  {!loadingClientes && !erroClientes && abertos.length > 0 && (
+                    <TableRow>
+                      <CelulaTotal className="text-left" >Total ({abertos.length})</CelulaTotal>
+                      <CelulaTotal />
+                      <CelulaTotal />
+                      <CelulaTotal className="text-right">{formatCurrency(totalAbertos.faturamento)}</CelulaTotal>
+                      <CelulaTotal className="text-right">{formatNumber(totalAbertos.pedidos)}</CelulaTotal>
+                      <CelulaTotal />
+                      <CelulaTotal />
+                      <CelulaTotal />
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
 
           {aba === "perdidos" && (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8" />
-                  <TableHead>Código</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead className="text-right">Faturamento {anoAnterior}</TableHead>
-                  <TableHead className="text-right">Pedidos</TableHead>
-                  <TableHead>Última Compra</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <LinhaEstado loading={loadingClientes} error={erroClientes} vazio={!loadingClientes && !erroClientes && perdidos.length === 0} colSpan={6} />
-                {!loadingClientes && !erroClientes && perdidos.map((c) => (
-                  <LinhaClientePerdido key={c.codParc} cliente={c} ano={anoAnterior} />
-                ))}
-              </TableBody>
-            </Table>
+            <div className={ALTURA_TABELA}>
+              <Table>
+                <TableHeader className="sticky top-0 z-20 bg-card">
+                  <TableRow>
+                    <TableHead className="w-8" />
+                    <TableHead>Código</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead className="text-right">Fat {anoAnterior}</TableHead>
+                    <TableHead className="text-right">Pedidos</TableHead>
+                    <TableHead>Última Compra</TableHead>
+                    <TableHead>Vendedor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <LinhaEstado loading={loadingClientes} error={erroClientes} vazio={!loadingClientes && !erroClientes && perdidos.length === 0} colSpan={7} />
+                  {!loadingClientes && !erroClientes && perdidos.map((c) => (
+                    <LinhaClientePerdido key={c.codParc} cliente={c} ano={anoAnterior} mercados={mercadosFiltro} vendedores={vendedoresFiltro} />
+                  ))}
+                  {!loadingClientes && !erroClientes && perdidos.length > 0 && (
+                    <TableRow>
+                      <CelulaTotal className="text-left">Total ({perdidos.length})</CelulaTotal>
+                      <CelulaTotal />
+                      <CelulaTotal />
+                      <CelulaTotal className="text-right">{formatCurrency(totalPerdidos.faturamento)}</CelulaTotal>
+                      <CelulaTotal className="text-right">{formatNumber(totalPerdidos.pedidos)}</CelulaTotal>
+                      <CelulaTotal />
+                      <CelulaTotal />
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
 
           {aba === "lancados" && (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8" />
-                  <TableHead>Código</TableHead>
-                  <TableHead>Produto</TableHead>
-                  <TableHead>Grupo</TableHead>
-                  <TableHead className="text-right">Volume {ano}</TableHead>
-                  <TableHead className="text-right">Faturamento {ano}</TableHead>
-                  <TableHead className="text-right">Clientes</TableHead>
-                  <TableHead>1ª Venda</TableHead>
-                  <TableHead>Última Venda</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <LinhaEstado loading={loadingProdutos} error={erroProdutos} vazio={!loadingProdutos && !erroProdutos && lancados.length === 0} colSpan={9} />
-                {!loadingProdutos && !erroProdutos && lancados.map((p) => (
-                  <LinhaProduto key={p.codProduto} produto={p} ano={anoNum} />
-                ))}
-              </TableBody>
-            </Table>
+            <div className={ALTURA_TABELA}>
+              <Table>
+                <TableHeader className="sticky top-0 z-20 bg-card">
+                  <TableRow>
+                    <TableHead className="w-8" />
+                    <TableHead>Código</TableHead>
+                    <TableHead>Produto</TableHead>
+                    <TableHead>Grupo</TableHead>
+                    <TableHead className="text-right">Volume {ano}</TableHead>
+                    <TableHead className="text-right">Fat {ano}</TableHead>
+                    <TableHead className="text-right">Clientes</TableHead>
+                    <TableHead>1ª Venda</TableHead>
+                    <TableHead>Última Venda</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <LinhaEstado loading={loadingProdutos} error={erroProdutos} vazio={!loadingProdutos && !erroProdutos && lancados.length === 0} colSpan={9} />
+                  {!loadingProdutos && !erroProdutos && lancados.map((p) => (
+                    <LinhaProduto key={p.codProduto} produto={p} ano={anoNum} mercados={mercadosFiltro} vendedores={vendedoresFiltro} />
+                  ))}
+                  {!loadingProdutos && !erroProdutos && lancados.length > 0 && (
+                    <TableRow>
+                      <CelulaTotal className="text-left">Total ({lancados.length})</CelulaTotal>
+                      <CelulaTotal />
+                      <CelulaTotal />
+                      <CelulaTotal />
+                      <CelulaTotal className="text-right">{formatKg(totalLancados.volume)}</CelulaTotal>
+                      <CelulaTotal className="text-right">{formatCurrency(totalLancados.faturamento)}</CelulaTotal>
+                      <CelulaTotal />
+                      <CelulaTotal />
+                      <CelulaTotal />
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
 
           {aba === "descontinuados" && (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8" />
-                  <TableHead>Código</TableHead>
-                  <TableHead>Produto</TableHead>
-                  <TableHead>Grupo</TableHead>
-                  <TableHead className="text-right">Volume {anoAnterior}</TableHead>
-                  <TableHead className="text-right">Faturamento {anoAnterior}</TableHead>
-                  <TableHead className="text-right">Clientes</TableHead>
-                  <TableHead>1ª Venda</TableHead>
-                  <TableHead>Última Venda</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <LinhaEstado loading={loadingProdutos} error={erroProdutos} vazio={!loadingProdutos && !erroProdutos && descontinuados.length === 0} colSpan={9} />
-                {!loadingProdutos && !erroProdutos && descontinuados.map((p) => (
-                  <LinhaProduto key={p.codProduto} produto={p} ano={anoAnterior} />
-                ))}
-              </TableBody>
-            </Table>
+            <div className={ALTURA_TABELA}>
+              <Table>
+                <TableHeader className="sticky top-0 z-20 bg-card">
+                  <TableRow>
+                    <TableHead className="w-8" />
+                    <TableHead>Código</TableHead>
+                    <TableHead>Produto</TableHead>
+                    <TableHead>Grupo</TableHead>
+                    <TableHead className="text-right">Volume {anoAnterior}</TableHead>
+                    <TableHead className="text-right">Fat {anoAnterior}</TableHead>
+                    <TableHead className="text-right">Clientes</TableHead>
+                    <TableHead>1ª Venda</TableHead>
+                    <TableHead>Última Venda</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <LinhaEstado loading={loadingProdutos} error={erroProdutos} vazio={!loadingProdutos && !erroProdutos && descontinuados.length === 0} colSpan={9} />
+                  {!loadingProdutos && !erroProdutos && descontinuados.map((p) => (
+                    <LinhaProduto key={p.codProduto} produto={p} ano={anoAnterior} mercados={mercadosFiltro} vendedores={vendedoresFiltro} />
+                  ))}
+                  {!loadingProdutos && !erroProdutos && descontinuados.length > 0 && (
+                    <TableRow>
+                      <CelulaTotal className="text-left">Total ({descontinuados.length})</CelulaTotal>
+                      <CelulaTotal />
+                      <CelulaTotal />
+                      <CelulaTotal />
+                      <CelulaTotal className="text-right">{formatKg(totalDescontinuados.volume)}</CelulaTotal>
+                      <CelulaTotal className="text-right">{formatCurrency(totalDescontinuados.faturamento)}</CelulaTotal>
+                      <CelulaTotal />
+                      <CelulaTotal />
+                      <CelulaTotal />
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
