@@ -10,6 +10,16 @@ import {
   type SnapshotClienteRow,
   type SnapshotProdutoRow,
 } from '../lib/api'
+import TarefaIndicador from '../components/TarefaIndicador'
+import { useTarefasPorOrigem } from '../hooks/useTarefasPorOrigem'
+import { TIPOS_OCORRENCIA_POR_ORIGEM } from '../lib/tarefas'
+
+const TIPOS_OCORRENCIA_SNAPSHOT = TIPOS_OCORRENCIA_POR_ORIGEM.COMPARATIVO_SEMANAL
+
+function sugerirTipoOcorrencia(delta: number, valorSemanaAnterior: number): string {
+  if (valorSemanaAnterior === 0 && delta > 0) return 'Novo Forecast'
+  return delta >= 0 ? 'Aumento' : 'Redução'
+}
 
 const DEFAULT_FILTROS: Filtros = { dataInicio: '2026-01-01', dataFim: '2026-12-31' }
 
@@ -68,7 +78,10 @@ function ValCell({ valor, prev, highlight }: { valor: number; prev: number | nul
 }
 
 // Linha de cliente (expansível)
-function ClienteRow({ row, dates, filtros }: { row: SnapshotClienteRow; dates: string[]; filtros: Filtros }) {
+function ClienteRow({ row, dates, filtros, contagemTarefas, onTarefaCriada }: {
+  row: SnapshotClienteRow; dates: string[]; filtros: Filtros;
+  contagemTarefas: (codParc?: number, codProduto?: number) => number; onTarefaCriada: () => void;
+}) {
   const [expanded, setExpanded] = useState(false)
   const { data: detalhe } = useQuery({
     queryKey: ['snapshot', 'historico-produtos', row.codParc, filtros],
@@ -78,6 +91,7 @@ function ClienteRow({ row, dates, filtros }: { row: SnapshotClienteRow; dates: s
   })
 
   const deltaTotal = deltaVsSemanaAnterior(row.currValor, dates, row.snapshots)
+  const semanaAnteriorValor = dates.length > 0 ? (row.snapshots[dates[dates.length - 1]]?.valor ?? 0) : 0
 
   return (
     <>
@@ -119,11 +133,26 @@ function ClienteRow({ row, dates, filtros }: { row: SnapshotClienteRow; dates: s
               </span>
           }
         </td>
+
+        {/* Tarefas */}
+        <td className="px-2 py-2 text-center whitespace-nowrap">
+          <TarefaIndicador
+            origem="COMPARATIVO_SEMANAL"
+            tiposOcorrencia={TIPOS_OCORRENCIA_SNAPSHOT}
+            tipoOcorrenciaSugerido={sugerirTipoOcorrencia(deltaTotal, semanaAnteriorValor)}
+            codParc={row.codParc}
+            razaoSocial={row.razaoSocial ?? undefined}
+            infoVariacao={`Forecast atual: ${formatCurrency(row.currValor)} · Semana anterior: ${formatCurrency(semanaAnteriorValor)} · Δ ${deltaTotal > 0 ? '+' : ''}${formatCurrency(deltaTotal)}`}
+            contagem={contagemTarefas(row.codParc)}
+            onCreated={onTarefaCriada}
+          />
+        </td>
       </tr>
 
       {/* Linhas de produto (expansão) */}
       {expanded && (detalhe?.rows ?? []).map((p: SnapshotProdutoRow) => {
         const pDelta = deltaVsSemanaAnterior(p.currValor, dates, p.snapshots)
+        const pSemanaAnteriorValor = dates.length > 0 ? (p.snapshots[dates[dates.length - 1]]?.valor ?? 0) : 0
         return (
           <tr key={p.codProduto} className="bg-slate-900/50 border-b border-slate-700/20">
             <td className="pl-10 pr-3 py-1.5 sticky left-0 bg-slate-900/50 z-10 border-r border-slate-700/40">
@@ -150,6 +179,20 @@ function ClienteRow({ row, dates, filtros }: { row: SnapshotClienteRow; dates: s
                   </span>
               }
             </td>
+            <td className="px-2 py-1.5 text-center">
+              <TarefaIndicador
+                origem="COMPARATIVO_SEMANAL"
+                tiposOcorrencia={TIPOS_OCORRENCIA_SNAPSHOT}
+                tipoOcorrenciaSugerido={sugerirTipoOcorrencia(pDelta, pSemanaAnteriorValor)}
+                codParc={row.codParc}
+                razaoSocial={row.razaoSocial ?? undefined}
+                codProduto={p.codProduto}
+                nomeProduto={p.nomeProduto ?? undefined}
+                infoVariacao={`Forecast atual: ${formatCurrency(p.currValor)} · Semana anterior: ${formatCurrency(pSemanaAnteriorValor)} · Δ ${pDelta > 0 ? '+' : ''}${formatCurrency(pDelta)}`}
+                contagem={contagemTarefas(row.codParc, p.codProduto)}
+                onCreated={onTarefaCriada}
+              />
+            </td>
           </tr>
         )
       })}
@@ -172,6 +215,8 @@ export default function SnapshotComparativo() {
     queryFn: () => getSnapshotHistorico(filtros),
     staleTime: 60_000,
   })
+
+  const { contagem: contagemTarefas, refetch: refetchTarefas } = useTarefasPorOrigem('COMPARATIVO_SEMANAL')
 
   const dates  = data?.dates ?? []
   const rows   = data?.rows  ?? []
@@ -270,7 +315,7 @@ export default function SnapshotComparativo() {
           </div>
 
           <div className="overflow-auto" style={{ maxHeight: `${ALTURA_TABELA_PX}px` }}>
-            <table className="w-full text-xs" style={{ minWidth: `${280 + dates.length * 110 + 120 + 90}px` }}>
+            <table className="w-full text-xs" style={{ minWidth: `${280 + dates.length * 110 + 120 + 90 + 90}px` }}>
               <thead className="bg-slate-800 sticky top-0 z-20">
                 <tr className="border-b border-slate-700">
                   {/* Cliente */}
@@ -290,6 +335,10 @@ export default function SnapshotComparativo() {
                   {/* Variação */}
                   <th className="text-right px-2 py-2.5 font-medium text-slate-400 w-[90px] border-l border-slate-700/40 whitespace-nowrap">
                     Variação
+                  </th>
+                  {/* Tarefas */}
+                  <th className="text-center px-2 py-2.5 font-medium text-slate-400 w-[90px] whitespace-nowrap">
+                    Tarefas
                   </th>
                 </tr>
 
@@ -341,6 +390,7 @@ export default function SnapshotComparativo() {
                           {Math.abs(totDelta) < 50 ? '—' : `${totDelta > 0 ? '+' : ''}${compact(totDelta)}`}
                         </span>
                       </td>
+                      <td className="px-2 py-2.5" />
                     </tr>
                   )
                 })()}
@@ -352,7 +402,7 @@ export default function SnapshotComparativo() {
                         <td className="px-3 py-2 sticky left-0 bg-slate-800 border-r border-slate-700/40">
                           <div className="h-3 bg-slate-700 rounded w-40" />
                         </td>
-                        {Array.from({ length: dates.length + 2 }).map((_, j) => (
+                        {Array.from({ length: dates.length + 3 }).map((_, j) => (
                           <td key={j} className="px-2 py-2">
                             <div className="h-3 bg-slate-700 rounded w-full" />
                           </td>
@@ -360,7 +410,10 @@ export default function SnapshotComparativo() {
                       </tr>
                     ))
                   : rowsExibidas.map((row: SnapshotClienteRow) => (
-                      <ClienteRow key={row.codParc} row={row} dates={dates} filtros={filtros} />
+                      <ClienteRow
+                        key={row.codParc} row={row} dates={dates} filtros={filtros}
+                        contagemTarefas={contagemTarefas} onTarefaCriada={refetchTarefas}
+                      />
                     ))
                 }
               </tbody>

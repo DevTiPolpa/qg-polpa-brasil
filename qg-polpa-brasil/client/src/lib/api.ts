@@ -1687,3 +1687,106 @@ export async function getMovimentacaoProdutoClientes(codProduto: number, ano: nu
   appendArrayParam(params, 'vendedores', vendedores)
   return apiRequest<MovimentacaoProdutoCliente[]>(`/api/movimentacao/produtos/${codProduto}/clientes?${params.toString()}`)
 }
+
+// ============================================================
+// Tarefas — acompanhamento manual de variações identificadas em Comparativo
+// Semanal, Movimentação de Clientes e Produtos e Recorrentes R×O.
+// ============================================================
+
+export type TaskOrigem = 'COMPARATIVO_SEMANAL' | 'MOVIMENTACAO_CLIENTES_PRODUTOS' | 'RECORRENTES_RXO'
+export type TaskStatus = 'PENDENTE' | 'EM_ANALISE' | 'AGUARDANDO_RETORNO' | 'CONCLUIDA'
+export type TaskHistoryTipoEvento = 'CRIACAO' | 'RESPONSAVEL' | 'STATUS' | 'PRAZO' | 'CAUSA' | 'ACOES'
+
+export type TaskHistoryEvent = {
+  id: number
+  tipoEvento: TaskHistoryTipoEvento
+  valorAnterior: string | null
+  valorNovo: string | null
+  usuarioId: number
+  usuarioNome: string | null
+  createdAt: string | null
+}
+
+export type ApiTask = {
+  id: number
+  origem: TaskOrigem
+  tipoOcorrencia: string
+  codParc: number | null
+  razaoSocial: string | null
+  codProduto: number | null
+  nomeProduto: string | null
+  infoVariacao: string | null
+  origemUrl: string | null
+  fato: string
+  causa: string | null
+  acoes: string | null
+  responsavelId: number
+  responsavelNome: string | null
+  status: TaskStatus
+  prazo: string
+  criadoPorId: number
+  criadoPorNome: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export type ApiTaskDetalhe = ApiTask & { historico: TaskHistoryEvent[] }
+
+export type TaskFiltros = {
+  origem?: TaskOrigem
+  status?: TaskStatus[]
+  responsavelId?: number
+  codParc?: number
+  codProduto?: number
+}
+
+export type TaskCreatePayload = {
+  origem: TaskOrigem
+  tipoOcorrencia: string
+  codParc?: number
+  razaoSocial?: string
+  codProduto?: number
+  nomeProduto?: string
+  infoVariacao?: string
+  origemUrl?: string
+  fato: string
+  responsavelId: number
+  prazo: string
+}
+
+export type TaskUpdatePayload = {
+  responsavelId?: number
+  prazo?: string
+  status?: TaskStatus
+  causa?: string
+  acoes?: string
+}
+
+export async function getTasks(filtros: TaskFiltros = {}): Promise<ApiTask[]> {
+  const params = new URLSearchParams()
+  if (filtros.origem) params.set('origem', filtros.origem)
+  appendArrayParam(params, 'status', filtros.status)
+  if (filtros.responsavelId != null) params.set('responsavelId', String(filtros.responsavelId))
+  if (filtros.codParc != null) params.set('codParc', String(filtros.codParc))
+  if (filtros.codProduto != null) params.set('codProduto', String(filtros.codProduto))
+  const query = params.toString()
+  return apiRequest<ApiTask[]>(`/api/tasks${query ? `?${query}` : ''}`)
+}
+
+export async function getTask(id: number): Promise<ApiTaskDetalhe> {
+  return apiRequest<ApiTaskDetalhe>(`/api/tasks/${id}`)
+}
+
+export async function createTask(payload: TaskCreatePayload): Promise<ApiTaskDetalhe> {
+  return apiRequest<ApiTaskDetalhe>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateTask(id: number, payload: TaskUpdatePayload): Promise<ApiTaskDetalhe> {
+  return apiRequest<ApiTaskDetalhe>(`/api/tasks/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}

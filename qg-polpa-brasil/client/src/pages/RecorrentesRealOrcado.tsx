@@ -9,6 +9,15 @@ import {
   getRecorrentesTabela,
   type RecorrentesFiltros,
 } from '../lib/api'
+import TarefaIndicador from '../components/TarefaIndicador'
+import { useTarefasPorOrigem } from '../hooks/useTarefasPorOrigem'
+import { TIPOS_OCORRENCIA_POR_ORIGEM } from '../lib/tarefas'
+
+const TIPOS_OCORRENCIA_RECORRENTES = TIPOS_OCORRENCIA_POR_ORIGEM.RECORRENTES_RXO
+
+function sugerirTipoOcorrenciaRecorrentes(pctVal: number | null): string {
+  return pctVal != null && pctVal < 0 ? 'Faturamento Abaixo do Orçado' : 'Faturamento Acima do Orçado'
+}
 
 const DEFAULT_FILTROS: Filtros = { dataInicio: '2026-01-01', dataFim: '2026-12-31' }
 
@@ -63,7 +72,10 @@ function KpiCard({ label, value, sub, icon: Icon, color }: {
   )
 }
 
-function ProdutosRow({ codParc, filtros }: { codParc: number; filtros: RecorrentesFiltros }) {
+function ProdutosRow({ codParc, razaoSocial, filtros, contagemTarefas, onTarefaCriada }: {
+  codParc: number; razaoSocial: string; filtros: RecorrentesFiltros;
+  contagemTarefas: (codParc?: number, codProduto?: number) => number; onTarefaCriada: () => void;
+}) {
   const { data: produtos, isLoading } = useQuery({
     queryKey: ['recorrentes', 'produtos', codParc, filtros],
     queryFn: () => getRecorrentesProdutos(codParc, filtros),
@@ -72,7 +84,7 @@ function ProdutosRow({ codParc, filtros }: { codParc: number; filtros: Recorrent
   const totalVolReal = (produtos ?? []).reduce((s, p) => s + Number(p.volAtual), 0)
 
   if (isLoading) return (
-    <tr><td colSpan={10} className="px-4 py-2 text-center text-slate-500 text-xs">Carregando produtos...</td></tr>
+    <tr><td colSpan={11} className="px-4 py-2 text-center text-slate-500 text-xs">Carregando produtos...</td></tr>
   )
   return (
     <>
@@ -100,6 +112,20 @@ function ProdutosRow({ codParc, filtros }: { codParc: number; filtros: Recorrent
             <td className="px-2 py-1.5 text-right text-slate-300 whitespace-nowrap">{formatCurrency(orcVal)}</td>
             <td className={`px-2 py-1.5 text-right font-semibold whitespace-nowrap ${pctVal != null ? pctColor(pctVal) : 'text-slate-500'}`}>{pctVal != null ? fmtPct(pctVal) : '—'}</td>
             <td className={`px-2 py-1.5 text-right font-semibold whitespace-nowrap ${difColor(dif)}`}>{formatCurrency(dif)}</td>
+            <td className="px-2 py-1.5 text-center">
+              <TarefaIndicador
+                origem="RECORRENTES_RXO"
+                tiposOcorrencia={TIPOS_OCORRENCIA_RECORRENTES}
+                tipoOcorrenciaSugerido={sugerirTipoOcorrenciaRecorrentes(pctVal)}
+                codParc={codParc}
+                razaoSocial={razaoSocial}
+                codProduto={p.codProduto}
+                nomeProduto={p.nomeProduto ?? undefined}
+                infoVariacao={`Volume: ${formatKg(vol)} (orçado ${formatKg(orcKg)}${pctKg != null ? `, Δ ${fmtPct(pctKg)}` : ''}) · Faturamento: ${formatCurrency(fat)} (orçado ${formatCurrency(orcVal)}${pctVal != null ? `, Δ ${fmtPct(pctVal)}` : ''})`}
+                contagem={contagemTarefas(codParc, p.codProduto)}
+                onCreated={onTarefaCriada}
+              />
+            </td>
           </tr>
         )
       })}
@@ -134,6 +160,8 @@ export default function RecorrentesRealOrcado() {
     queryFn: () => getRecorrentesTabela(filtros),
     staleTime: 60_000,
   })
+
+  const { contagem: contagemTarefas, refetch: refetchTarefas } = useTarefasPorOrigem('RECORRENTES_RXO')
 
   const totalVolReal = useMemo(() => (tabela ?? []).reduce((s, r) => s + Number(r.volAtual), 0), [tabela])
   const totalFatReal = useMemo(() => (tabela ?? []).reduce((s, r) => s + Number(r.fatAtual), 0), [tabela])
@@ -206,7 +234,7 @@ export default function RecorrentesRealOrcado() {
 
       <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
         <div className="overflow-auto" style={{ maxHeight: `${ALTURA_TABELA_PX}px` }}>
-          <table className="w-full text-xs min-w-[960px]">
+          <table className="w-full text-xs min-w-[1040px]">
             <thead className="sticky top-0 z-20 bg-slate-900">
               <tr className="border-b border-slate-700 bg-slate-900/40">
                 <SortTh label="Código — Cliente"  col="razaoSocial" {...sp} left />
@@ -219,6 +247,7 @@ export default function RecorrentesRealOrcado() {
                 <SortTh label="Orç. R$"           col="orcVal"      {...sp} />
                 <SortTh label="Δ R$"              col="pctVal"      {...sp} />
                 <SortTh label="Dif. R$"           col="dif"         {...sp} />
+                <th className="px-2 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">Tarefas</th>
               </tr>
 
               {/* Linha de totais — fixa no topo, junto com o cabeçalho */}
@@ -243,13 +272,14 @@ export default function RecorrentesRealOrcado() {
                     <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatCurrency(tOrc)}</td>
                     <td className={`px-2 py-2.5 text-right whitespace-nowrap ${pVal != null ? pctColor(pVal) : ''}`}>{pVal != null ? fmtPct(pVal) : '—'}</td>
                     <td className={`px-2 py-2.5 text-right whitespace-nowrap ${difColor(dif)}`}>{formatCurrency(dif)}</td>
+                    <td className="px-2 py-2.5" />
                   </tr>
                 )
               })()}
             </thead>
             <tbody className="divide-y divide-slate-700/40">
               {tabelaLoad && (
-                <tr><td colSpan={10} className="text-center py-8 text-slate-500">Carregando...</td></tr>
+                <tr><td colSpan={11} className="text-center py-8 text-slate-500">Carregando...</td></tr>
               )}
               {!tabelaLoad && sortedData.map(row => {
                 const isOpen = expanded.has(row.codParc)
@@ -275,8 +305,25 @@ export default function RecorrentesRealOrcado() {
                       <td className="px-2 py-2 text-right text-slate-200 whitespace-nowrap">{formatCurrency(row.orcVal)}</td>
                       <td className={`px-2 py-2 text-right font-semibold whitespace-nowrap ${row.pctVal !== -Infinity ? pctColor(row.pctVal) : 'text-slate-500'}`}>{row.pctVal !== -Infinity ? fmtPct(row.pctVal) : '—'}</td>
                       <td className={`px-2 py-2 text-right font-semibold whitespace-nowrap ${difColor(row.dif)}`}>{formatCurrency(row.dif)}</td>
+                      <td className="px-2 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                        <TarefaIndicador
+                          origem="RECORRENTES_RXO"
+                          tiposOcorrencia={TIPOS_OCORRENCIA_RECORRENTES}
+                          tipoOcorrenciaSugerido={sugerirTipoOcorrenciaRecorrentes(row.pctVal !== -Infinity ? row.pctVal : null)}
+                          codParc={row.codParc}
+                          razaoSocial={row.razaoSocial}
+                          infoVariacao={`Volume: ${formatKg(row.vol)} (orçado ${formatKg(row.orcKg)}${row.pctKg !== -Infinity ? `, Δ ${fmtPct(row.pctKg)}` : ''}) · Faturamento: ${formatCurrency(row.fat)} (orçado ${formatCurrency(row.orcVal)}${row.pctVal !== -Infinity ? `, Δ ${fmtPct(row.pctVal)}` : ''})`}
+                          contagem={contagemTarefas(row.codParc)}
+                          onCreated={refetchTarefas}
+                        />
+                      </td>
                     </tr>
-                    {isOpen && <ProdutosRow codParc={row.codParc} filtros={filtros} />}
+                    {isOpen && (
+                      <ProdutosRow
+                        codParc={row.codParc} razaoSocial={row.razaoSocial} filtros={filtros}
+                        contagemTarefas={contagemTarefas} onTarefaCriada={refetchTarefas}
+                      />
+                    )}
                   </Fragment>
                 )
               })}

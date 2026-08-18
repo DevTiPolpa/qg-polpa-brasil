@@ -14,8 +14,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs } from "@/components/ui/tabs";
 import MultiSelect from "@/components/MultiSelect";
+import TarefaIndicador from "@/components/TarefaIndicador";
+import { useTarefasPorOrigem } from "@/hooks/useTarefasPorOrigem";
+import { TIPOS_OCORRENCIA_POR_ORIGEM } from "@/lib/tarefas";
 import { formatCurrency, formatKg, formatNumber, formatData } from "@/lib/utils";
 import { ArrowLeftRight, UserPlus, UserMinus, PackagePlus, PackageMinus, AlertTriangle, ChevronRight, ChevronDown } from "lucide-react";
+
+const TIPOS_OCORRENCIA_MOVIMENTACAO = TIPOS_OCORRENCIA_POR_ORIGEM.MOVIMENTACAO_CLIENTES_PRODUTOS;
 
 const ANOS = ["2024", "2025", "2026", "2027"];
 
@@ -158,7 +163,10 @@ function ClientesDoProduto({ codProduto, ano, mercados, vendedores }: { codProdu
   );
 }
 
-function LinhaClienteAberto({ cliente, ano, mercados, vendedores }: { cliente: MovimentacaoClienteAberto; ano: number; mercados?: string[]; vendedores?: string[] }) {
+function LinhaClienteAberto({ cliente, ano, mercados, vendedores, contagemTarefas, onTarefaCriada }: {
+  cliente: MovimentacaoClienteAberto; ano: number; mercados?: string[]; vendedores?: string[];
+  contagemTarefas: number; onTarefaCriada: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   return (
     <>
@@ -171,6 +179,59 @@ function LinhaClienteAberto({ cliente, ano, mercados, vendedores }: { cliente: M
         <TableCell className="text-muted-foreground">{formatData(cliente.primeiraCompra)}</TableCell>
         <TableCell className="text-muted-foreground">{formatData(cliente.ultimaCompra)}</TableCell>
         <TableCell className="text-muted-foreground max-w-[160px] truncate" title={cliente.vendedorUltimaCompra ?? undefined}>{cliente.vendedorUltimaCompra ?? "-"}</TableCell>
+        <TableCell>
+          <TarefaIndicador
+            origem="MOVIMENTACAO_CLIENTES_PRODUTOS"
+            tiposOcorrencia={TIPOS_OCORRENCIA_MOVIMENTACAO}
+            tipoOcorrenciaSugerido="Cliente Aberto"
+            codParc={cliente.codParc}
+            razaoSocial={cliente.razaoSocial}
+            infoVariacao={`Faturamento ${ano}: ${formatCurrency(cliente.faturamento)} · Pedidos: ${formatNumber(cliente.pedidos)} · Última compra: ${formatData(cliente.ultimaCompra)}`}
+            contagem={contagemTarefas}
+            onCreated={onTarefaCriada}
+          />
+        </TableCell>
+      </TableRow>
+      {expanded && (
+        <TableRow>
+          <TableCell colSpan={9} className="bg-background/40 py-0">
+            <div className="pl-9 pr-2">
+              <ProdutosDoCliente codParc={cliente.codParc} ano={ano} mercados={mercados} vendedores={vendedores} />
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+}
+
+function LinhaClientePerdido({ cliente, ano, mercados, vendedores, contagemTarefas, onTarefaCriada }: {
+  cliente: MovimentacaoClientePerdido; ano: number; mercados?: string[]; vendedores?: string[];
+  contagemTarefas: number; onTarefaCriada: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <>
+      <TableRow className="cursor-pointer" onClick={() => setExpanded((v) => !v)}>
+        <TableCell className="w-8"><BotaoExpandir expanded={expanded} /></TableCell>
+        <TableCell className="text-muted-foreground tabular-nums">{cliente.codParc}</TableCell>
+        <TableCell className="font-medium text-foreground max-w-[260px] truncate" title={cliente.razaoSocial}>{cliente.razaoSocial}</TableCell>
+        <TableCell className="text-right font-semibold text-foreground tabular-nums">{formatCurrency(cliente.faturamento)}</TableCell>
+        <TableCell className="text-right tabular-nums">{formatNumber(cliente.pedidos)}</TableCell>
+        <TableCell className="text-muted-foreground">{formatData(cliente.ultimaCompra)}</TableCell>
+        <TableCell className="text-muted-foreground max-w-[160px] truncate" title={cliente.vendedorUltimaCompra ?? undefined}>{cliente.vendedorUltimaCompra ?? "-"}</TableCell>
+        <TableCell>
+          <TarefaIndicador
+            origem="MOVIMENTACAO_CLIENTES_PRODUTOS"
+            tiposOcorrencia={TIPOS_OCORRENCIA_MOVIMENTACAO}
+            tipoOcorrenciaSugerido="Cliente Perdido"
+            codParc={cliente.codParc}
+            razaoSocial={cliente.razaoSocial}
+            infoVariacao={`Faturamento ${ano}: ${formatCurrency(cliente.faturamento)} · Pedidos: ${formatNumber(cliente.pedidos)} · Última compra: ${formatData(cliente.ultimaCompra)}`}
+            contagem={contagemTarefas}
+            onCreated={onTarefaCriada}
+          />
+        </TableCell>
       </TableRow>
       {expanded && (
         <TableRow>
@@ -185,33 +246,10 @@ function LinhaClienteAberto({ cliente, ano, mercados, vendedores }: { cliente: M
   );
 }
 
-function LinhaClientePerdido({ cliente, ano, mercados, vendedores }: { cliente: MovimentacaoClientePerdido; ano: number; mercados?: string[]; vendedores?: string[] }) {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <>
-      <TableRow className="cursor-pointer" onClick={() => setExpanded((v) => !v)}>
-        <TableCell className="w-8"><BotaoExpandir expanded={expanded} /></TableCell>
-        <TableCell className="text-muted-foreground tabular-nums">{cliente.codParc}</TableCell>
-        <TableCell className="font-medium text-foreground max-w-[260px] truncate" title={cliente.razaoSocial}>{cliente.razaoSocial}</TableCell>
-        <TableCell className="text-right font-semibold text-foreground tabular-nums">{formatCurrency(cliente.faturamento)}</TableCell>
-        <TableCell className="text-right tabular-nums">{formatNumber(cliente.pedidos)}</TableCell>
-        <TableCell className="text-muted-foreground">{formatData(cliente.ultimaCompra)}</TableCell>
-        <TableCell className="text-muted-foreground max-w-[160px] truncate" title={cliente.vendedorUltimaCompra ?? undefined}>{cliente.vendedorUltimaCompra ?? "-"}</TableCell>
-      </TableRow>
-      {expanded && (
-        <TableRow>
-          <TableCell colSpan={7} className="bg-background/40 py-0">
-            <div className="pl-9 pr-2">
-              <ProdutosDoCliente codParc={cliente.codParc} ano={ano} mercados={mercados} vendedores={vendedores} />
-            </div>
-          </TableCell>
-        </TableRow>
-      )}
-    </>
-  );
-}
-
-function LinhaProduto({ produto, ano, mercados, vendedores }: { produto: MovimentacaoProduto; ano: number; mercados?: string[]; vendedores?: string[] }) {
+function LinhaProduto({ produto, ano, mercados, vendedores, tipoOcorrencia, contagemTarefas, onTarefaCriada }: {
+  produto: MovimentacaoProduto; ano: number; mercados?: string[]; vendedores?: string[];
+  tipoOcorrencia: "Produto Lançado" | "Produto Descontinuado"; contagemTarefas: number; onTarefaCriada: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   return (
     <>
@@ -225,10 +263,22 @@ function LinhaProduto({ produto, ano, mercados, vendedores }: { produto: Movimen
         <TableCell className="text-right tabular-nums">{formatNumber(produto.clientes)}</TableCell>
         <TableCell className="text-muted-foreground">{formatData(produto.primeiraVenda)}</TableCell>
         <TableCell className="text-muted-foreground">{formatData(produto.ultimaVenda)}</TableCell>
+        <TableCell>
+          <TarefaIndicador
+            origem="MOVIMENTACAO_CLIENTES_PRODUTOS"
+            tiposOcorrencia={TIPOS_OCORRENCIA_MOVIMENTACAO}
+            tipoOcorrenciaSugerido={tipoOcorrencia}
+            codProduto={produto.codProduto}
+            nomeProduto={produto.nomeProduto}
+            infoVariacao={`Volume ${ano}: ${formatKg(produto.volume)} · Faturamento: ${formatCurrency(produto.faturamento)} · Clientes: ${formatNumber(produto.clientes)}`}
+            contagem={contagemTarefas}
+            onCreated={onTarefaCriada}
+          />
+        </TableCell>
       </TableRow>
       {expanded && (
         <TableRow>
-          <TableCell colSpan={9} className="bg-background/40 py-0">
+          <TableCell colSpan={10} className="bg-background/40 py-0">
             <div className="pl-9 pr-2">
               <ClientesDoProduto codProduto={produto.codProduto} ano={ano} mercados={mercados} vendedores={vendedores} />
             </div>
@@ -256,6 +306,8 @@ export default function MovimentacaoClientesProdutos() {
   });
   const mercadosDisponiveis = filtrosDisponiveis?.mercados ?? [];
   const vendedoresDisponiveis = filtrosDisponiveis?.vendedores ?? [];
+
+  const { contagem: contagemTarefas, refetch: refetchTarefas } = useTarefasPorOrigem("MOVIMENTACAO_CLIENTES_PRODUTOS");
 
   const { data: clientes, isLoading: loadingClientes, isError: erroClientes } = useQuery({
     queryKey: ["movimentacao-clientes", anoNum, mercadosFiltro, vendedoresFiltro],
@@ -378,12 +430,16 @@ export default function MovimentacaoClientesProdutos() {
                     <TableHead>1ª Compra</TableHead>
                     <TableHead>Última Compra</TableHead>
                     <TableHead>Vendedor</TableHead>
+                    <TableHead>Tarefas</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <LinhaEstado loading={loadingClientes} error={erroClientes} vazio={!loadingClientes && !erroClientes && abertos.length === 0} colSpan={8} />
+                  <LinhaEstado loading={loadingClientes} error={erroClientes} vazio={!loadingClientes && !erroClientes && abertos.length === 0} colSpan={9} />
                   {!loadingClientes && !erroClientes && abertos.map((c) => (
-                    <LinhaClienteAberto key={c.codParc} cliente={c} ano={anoNum} mercados={mercadosFiltro} vendedores={vendedoresFiltro} />
+                    <LinhaClienteAberto
+                      key={c.codParc} cliente={c} ano={anoNum} mercados={mercadosFiltro} vendedores={vendedoresFiltro}
+                      contagemTarefas={contagemTarefas(c.codParc)} onTarefaCriada={refetchTarefas}
+                    />
                   ))}
                   {!loadingClientes && !erroClientes && abertos.length > 0 && (
                     <TableRow>
@@ -392,6 +448,7 @@ export default function MovimentacaoClientesProdutos() {
                       <CelulaTotal />
                       <CelulaTotal className="text-right">{formatCurrency(totalAbertos.faturamento)}</CelulaTotal>
                       <CelulaTotal className="text-right">{formatNumber(totalAbertos.pedidos)}</CelulaTotal>
+                      <CelulaTotal />
                       <CelulaTotal />
                       <CelulaTotal />
                       <CelulaTotal />
@@ -414,12 +471,16 @@ export default function MovimentacaoClientesProdutos() {
                     <TableHead className="text-right">Pedidos</TableHead>
                     <TableHead>Última Compra</TableHead>
                     <TableHead>Vendedor</TableHead>
+                    <TableHead>Tarefas</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <LinhaEstado loading={loadingClientes} error={erroClientes} vazio={!loadingClientes && !erroClientes && perdidos.length === 0} colSpan={7} />
+                  <LinhaEstado loading={loadingClientes} error={erroClientes} vazio={!loadingClientes && !erroClientes && perdidos.length === 0} colSpan={8} />
                   {!loadingClientes && !erroClientes && perdidos.map((c) => (
-                    <LinhaClientePerdido key={c.codParc} cliente={c} ano={anoAnterior} mercados={mercadosFiltro} vendedores={vendedoresFiltro} />
+                    <LinhaClientePerdido
+                      key={c.codParc} cliente={c} ano={anoAnterior} mercados={mercadosFiltro} vendedores={vendedoresFiltro}
+                      contagemTarefas={contagemTarefas(c.codParc)} onTarefaCriada={refetchTarefas}
+                    />
                   ))}
                   {!loadingClientes && !erroClientes && perdidos.length > 0 && (
                     <TableRow>
@@ -428,6 +489,7 @@ export default function MovimentacaoClientesProdutos() {
                       <CelulaTotal />
                       <CelulaTotal className="text-right">{formatCurrency(totalPerdidos.faturamento)}</CelulaTotal>
                       <CelulaTotal className="text-right">{formatNumber(totalPerdidos.pedidos)}</CelulaTotal>
+                      <CelulaTotal />
                       <CelulaTotal />
                       <CelulaTotal />
                     </TableRow>
@@ -451,12 +513,16 @@ export default function MovimentacaoClientesProdutos() {
                     <TableHead className="text-right">Clientes</TableHead>
                     <TableHead>1ª Venda</TableHead>
                     <TableHead>Última Venda</TableHead>
+                    <TableHead>Tarefas</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <LinhaEstado loading={loadingProdutos} error={erroProdutos} vazio={!loadingProdutos && !erroProdutos && lancados.length === 0} colSpan={9} />
+                  <LinhaEstado loading={loadingProdutos} error={erroProdutos} vazio={!loadingProdutos && !erroProdutos && lancados.length === 0} colSpan={10} />
                   {!loadingProdutos && !erroProdutos && lancados.map((p) => (
-                    <LinhaProduto key={p.codProduto} produto={p} ano={anoNum} mercados={mercadosFiltro} vendedores={vendedoresFiltro} />
+                    <LinhaProduto
+                      key={p.codProduto} produto={p} ano={anoNum} mercados={mercadosFiltro} vendedores={vendedoresFiltro}
+                      tipoOcorrencia="Produto Lançado" contagemTarefas={contagemTarefas(undefined, p.codProduto)} onTarefaCriada={refetchTarefas}
+                    />
                   ))}
                   {!loadingProdutos && !erroProdutos && lancados.length > 0 && (
                     <TableRow>
@@ -466,6 +532,7 @@ export default function MovimentacaoClientesProdutos() {
                       <CelulaTotal />
                       <CelulaTotal className="text-right">{formatKg(totalLancados.volume)}</CelulaTotal>
                       <CelulaTotal className="text-right">{formatCurrency(totalLancados.faturamento)}</CelulaTotal>
+                      <CelulaTotal />
                       <CelulaTotal />
                       <CelulaTotal />
                       <CelulaTotal />
@@ -490,12 +557,16 @@ export default function MovimentacaoClientesProdutos() {
                     <TableHead className="text-right">Clientes</TableHead>
                     <TableHead>1ª Venda</TableHead>
                     <TableHead>Última Venda</TableHead>
+                    <TableHead>Tarefas</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <LinhaEstado loading={loadingProdutos} error={erroProdutos} vazio={!loadingProdutos && !erroProdutos && descontinuados.length === 0} colSpan={9} />
+                  <LinhaEstado loading={loadingProdutos} error={erroProdutos} vazio={!loadingProdutos && !erroProdutos && descontinuados.length === 0} colSpan={10} />
                   {!loadingProdutos && !erroProdutos && descontinuados.map((p) => (
-                    <LinhaProduto key={p.codProduto} produto={p} ano={anoAnterior} mercados={mercadosFiltro} vendedores={vendedoresFiltro} />
+                    <LinhaProduto
+                      key={p.codProduto} produto={p} ano={anoAnterior} mercados={mercadosFiltro} vendedores={vendedoresFiltro}
+                      tipoOcorrencia="Produto Descontinuado" contagemTarefas={contagemTarefas(undefined, p.codProduto)} onTarefaCriada={refetchTarefas}
+                    />
                   ))}
                   {!loadingProdutos && !erroProdutos && descontinuados.length > 0 && (
                     <TableRow>
@@ -505,6 +576,7 @@ export default function MovimentacaoClientesProdutos() {
                       <CelulaTotal />
                       <CelulaTotal className="text-right">{formatKg(totalDescontinuados.volume)}</CelulaTotal>
                       <CelulaTotal className="text-right">{formatCurrency(totalDescontinuados.faturamento)}</CelulaTotal>
+                      <CelulaTotal />
                       <CelulaTotal />
                       <CelulaTotal />
                       <CelulaTotal />

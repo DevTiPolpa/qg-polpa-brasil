@@ -16,6 +16,7 @@ import Chat from './pages/Chat'
 import SnapshotComparativo from './pages/SnapshotComparativo'
 import HistoricoClientes from './pages/HistoricoClientes'
 import MovimentacaoClientesProdutos from './pages/MovimentacaoClientesProdutos'
+import Tarefas from './pages/Tarefas'
 import FunilScorecard from './pages/FunilScorecard'
 import GeracaoListasHistorico from './pages/GeracaoListasHistorico'
 import GeracaoListasNovo from './pages/GeracaoListasNovo'
@@ -69,6 +70,7 @@ function AppRoutes() {
         <Route path="/snapshot" component={SnapshotComparativo} />
         <Route path="/historico-clientes" component={HistoricoClientes} />
         <Route path="/movimentacao" component={MovimentacaoClientesProdutos} />
+        <Route path="/tarefas" component={Tarefas} />
         <Route path="/funil-vendas" component={FunilVendas} />
         <Route path="/panorama-crm" component={PanoramaCrm} />
         <Route path="/funil-scorecard" component={FunilScorecard} />

@@ -2,14 +2,17 @@ import { useState } from 'react'
 import { useLocation } from 'wouter'
 import {
   LayoutDashboard, Users, UserCog, LogOut,
-  ChevronLeft, ChevronRight, FolderOpen, BarChart2, Target, Menu, X, MessageSquare, History, Gauge, ListChecks, ArrowLeftRight,
+  ChevronLeft, ChevronRight, FolderOpen, BarChart2, Target, Menu, X, MessageSquare, History, Gauge, ListChecks, ArrowLeftRight, ListTodo,
 } from 'lucide-react'
 import { logout } from '../lib/api'
 
 const menuGroups = [
   {
     group: 'Visão Geral',
-    items: [{ icon: LayoutDashboard, label: 'Dashboard', path: '/' }],
+    items: [
+      { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
+      { icon: ListTodo,        label: 'Tarefas',   path: '/tarefas' },
+    ],
   },
   {
     group: 'Análises',
