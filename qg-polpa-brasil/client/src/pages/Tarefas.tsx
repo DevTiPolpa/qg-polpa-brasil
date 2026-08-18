@@ -21,6 +21,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import MultiSelect from "@/components/MultiSelect";
 import { formatData } from "@/lib/utils";
 import {
   ListTodo,
@@ -256,6 +257,7 @@ export default function Tarefas() {
   const search = useSearch();
   const queryClient = useQueryClient();
   const [filtroKpi, setFiltroKpi] = useState<FiltroKpi>(null);
+  const [responsaveisFiltro, setResponsaveisFiltro] = useState<string[]>([]);
   const [tarefaSelecionada, setTarefaSelecionada] = useState<number | null>(null);
 
   const searchParams = new URLSearchParams(search);
@@ -278,19 +280,28 @@ export default function Tarefas() {
     queryClient.invalidateQueries({ queryKey: ["tasks-por-origem"] });
   }
 
+  const responsaveisDisponiveis = useMemo(() => (
+    Array.from(new Set(tarefas.map(t => t.responsavelNome).filter((n): n is string => Boolean(n)))).sort((a, b) => a.localeCompare(b))
+  ), [tarefas]);
+
+  const tarefasDoResponsavel = useMemo(() => {
+    if (responsaveisFiltro.length === 0) return tarefas;
+    return tarefas.filter(t => t.responsavelNome && responsaveisFiltro.includes(t.responsavelNome));
+  }, [tarefas, responsaveisFiltro]);
+
   const kpis = useMemo(() => ({
-    pendentes: tarefas.filter(t => t.status === "PENDENTE").length,
-    emAnalise: tarefas.filter(t => t.status === "EM_ANALISE").length,
-    aguardandoRetorno: tarefas.filter(t => t.status === "AGUARDANDO_RETORNO").length,
-    concluidas: tarefas.filter(t => t.status === "CONCLUIDA").length,
-    vencidas: tarefas.filter(isVencida).length,
-  }), [tarefas]);
+    pendentes: tarefasDoResponsavel.filter(t => t.status === "PENDENTE").length,
+    emAnalise: tarefasDoResponsavel.filter(t => t.status === "EM_ANALISE").length,
+    aguardandoRetorno: tarefasDoResponsavel.filter(t => t.status === "AGUARDANDO_RETORNO").length,
+    concluidas: tarefasDoResponsavel.filter(t => t.status === "CONCLUIDA").length,
+    vencidas: tarefasDoResponsavel.filter(isVencida).length,
+  }), [tarefasDoResponsavel]);
 
   const tarefasFiltradas = useMemo(() => {
-    if (!filtroKpi) return tarefas;
-    if (filtroKpi === "VENCIDA") return tarefas.filter(isVencida);
-    return tarefas.filter(t => t.status === filtroKpi);
-  }, [tarefas, filtroKpi]);
+    if (!filtroKpi) return tarefasDoResponsavel;
+    if (filtroKpi === "VENCIDA") return tarefasDoResponsavel.filter(isVencida);
+    return tarefasDoResponsavel.filter(t => t.status === filtroKpi);
+  }, [tarefasDoResponsavel, filtroKpi]);
 
   return (
     <div className="space-y-4">
@@ -306,16 +317,29 @@ export default function Tarefas() {
         </div>
       </div>
 
-      {temFiltroLinha && (
-        <div className="flex items-center gap-2 text-xs bg-muted/50 border border-border rounded-lg px-3 py-2 w-fit">
-          <span className="text-muted-foreground">
-            Filtrado por: <span className="text-foreground font-medium">{ORIGEM_LABEL[origemFiltro as ApiTask["origem"]]}</span>
-            {codParcFiltro != null && <span> · Cliente {codParcFiltro}</span>}
-            {codProdutoFiltro != null && <span> · Produto {codProdutoFiltro}</span>}
-          </span>
-          <a href="/tarefas" className="text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></a>
+      <div className="flex items-center gap-4 flex-wrap">
+        {temFiltroLinha && (
+          <div className="flex items-center gap-2 text-xs bg-muted/50 border border-border rounded-lg px-3 py-2 w-fit">
+            <span className="text-muted-foreground">
+              Filtrado por: <span className="text-foreground font-medium">{ORIGEM_LABEL[origemFiltro as ApiTask["origem"]]}</span>
+              {codParcFiltro != null && <span> · Cliente {codParcFiltro}</span>}
+              {codProdutoFiltro != null && <span> · Produto {codProdutoFiltro}</span>}
+            </span>
+            <a href="/tarefas" className="text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></a>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Responsável</span>
+          <MultiSelect
+            options={responsaveisDisponiveis}
+            selected={responsaveisFiltro}
+            onChange={setResponsaveisFiltro}
+            placeholder="Todos os responsáveis"
+            className="w-56"
+          />
         </div>
-      )}
+      </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <KpiCard label="Pendentes" value={kpis.pendentes} icon={Hourglass} iconClass="bg-slate-700/50 text-slate-300" active={filtroKpi === "PENDENTE"} onClick={() => setFiltroKpi(f => f === "PENDENTE" ? null : "PENDENTE")} />
