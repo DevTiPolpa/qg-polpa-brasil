@@ -13,14 +13,92 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import MultiSelect from "@/components/MultiSelect";
 import TarefaIndicador from "@/components/TarefaIndicador";
 import { useTarefasPorOrigem } from "@/hooks/useTarefasPorOrigem";
 import { TIPOS_OCORRENCIA_POR_ORIGEM } from "@/lib/tarefas";
 import { formatCurrency, formatKg, formatNumber, formatData } from "@/lib/utils";
-import { ArrowLeftRight, UserPlus, UserMinus, PackagePlus, PackageMinus, AlertTriangle, ChevronRight, ChevronDown } from "lucide-react";
+import { ArrowLeftRight, UserPlus, UserMinus, PackagePlus, PackageMinus, AlertTriangle, ChevronRight, ChevronDown, HelpCircle, X } from "lucide-react";
 
 const TIPOS_OCORRENCIA_MOVIMENTACAO = TIPOS_OCORRENCIA_POR_ORIGEM.MOVIMENTACAO_CLIENTES_PRODUTOS;
+
+// ─── Modal "Como funciona" ───────────────────────────────────────────────
+function AjudaItem({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <h4 className="text-sm font-semibold text-foreground">{titulo}</h4>
+      <div className="space-y-1">{children}</div>
+    </div>
+  );
+}
+
+function AjudaModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-card border-border">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-foreground">Como funciona a Movimentação de Clientes e Produtos</DialogTitle>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Compara o ano selecionado com o ano anterior para mostrar quem entrou e quem saiu da base — de clientes e de produtos.
+          </p>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">1. As 4 visões</h3>
+            <AjudaItem titulo="Clientes Abertos">
+              <p className="text-sm text-muted-foreground">Clientes que compraram no ano selecionado mas <b className="text-foreground">não</b> tinham comprado no ano anterior — clientes novos ou reativados.</p>
+            </AjudaItem>
+            <AjudaItem titulo="Clientes Perdidos">
+              <p className="text-sm text-muted-foreground">Clientes que compraram no ano anterior mas <b className="text-foreground">não</b> compraram no ano selecionado — pararam de comprar.</p>
+            </AjudaItem>
+            <AjudaItem titulo="Produtos Lançados">
+              <p className="text-sm text-muted-foreground">Produtos vendidos no ano selecionado mas <b className="text-foreground">não</b> vendidos no ano anterior.</p>
+            </AjudaItem>
+            <AjudaItem titulo="Produtos Descontinuados">
+              <p className="text-sm text-muted-foreground">Produtos vendidos no ano anterior mas <b className="text-foreground">não</b> vendidos no ano selecionado.</p>
+            </AjudaItem>
+            <p className="text-sm text-muted-foreground">A régua é sempre presença ou ausência de venda real (registro em <span className="text-foreground">fato_vendas</span>), nunca cadastro — cliente/produto cadastrado que nunca vendeu não entra em nenhuma das 4 listas.</p>
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">2. Filtros</h3>
+            <AjudaItem titulo="Ano">
+              <p className="text-sm text-muted-foreground">Define o ano selecionado; o ano anterior (comparação) é sempre o ano imediatamente anterior a ele.</p>
+            </AjudaItem>
+            <AjudaItem titulo="Mercado de Vendas e Vendedor">
+              <p className="text-sm text-muted-foreground">Aceitam seleção múltipla e recalculam as 4 visões considerando só as vendas daquele(s) mercado(s)/vendedor(es) — em ambos os anos comparados.</p>
+            </AjudaItem>
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">3. Detalhamento</h3>
+            <AjudaItem titulo="Expandir uma linha">
+              <p className="text-sm text-muted-foreground">Clicar numa linha de cliente mostra os produtos que ele comprou naquele ano; clicar numa linha de produto mostra os clientes que o compraram naquele ano.</p>
+            </AjudaItem>
+            <AjudaItem titulo="Vendedor (Última Compra)">
+              <p className="text-sm text-muted-foreground">Nas visões de clientes, mostra quem atendeu a venda mais recente daquele cliente no ano de referência.</p>
+            </AjudaItem>
+            <AjudaItem titulo="Total no rodapé">
+              <p className="text-sm text-muted-foreground">Cada tabela mostra 20 linhas por vez (o resto rola) e mantém uma linha de soma fixa no rodapé, sempre visível.</p>
+            </AjudaItem>
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">4. Tarefas</h3>
+            <p className="text-sm text-muted-foreground">
+              Qualquer linha (cliente ou produto) pode virar uma tarefa de acompanhamento — botão de criar tarefa em cada linha, com o Tipo de Ocorrência já sugerido conforme a visão (Cliente Aberto, Cliente Perdido, Produto Lançado ou Produto Descontinuado). Linhas com tarefas já criadas mostram um indicador "📋 N" que leva direto para elas.
+            </p>
+          </section>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 const ANOS = ["2024", "2025", "2026", "2027"];
 
@@ -294,6 +372,7 @@ export default function MovimentacaoClientesProdutos() {
   const [mercadosSelecionados, setMercadosSelecionados] = useState<string[]>([]);
   const [vendedoresSelecionados, setVendedoresSelecionados] = useState<string[]>([]);
   const [aba, setAba] = useState<AbaValue>("abertos");
+  const [ajudaOpen, setAjudaOpen] = useState(false);
   const anoNum = Number(ano);
   const anoAnterior = anoNum - 1;
   const mercadosFiltro = mercadosSelecionados.length ? mercadosSelecionados : undefined;
@@ -359,6 +438,13 @@ export default function MovimentacaoClientesProdutos() {
             Comparativo {ano} vs {anoAnterior} · clique numa linha para ver o detalhe · clientes e produtos que entraram ou saíram da base
           </p>
         </div>
+        <button
+          onClick={() => setAjudaOpen(true)}
+          title="Como funciona"
+          className="w-9 h-9 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center shrink-0"
+        >
+          <HelpCircle className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Filtros: Ano, Mercado de Vendas e Vendedor (Mercado e Vendedor aceitam múltipla seleção) */}
@@ -588,6 +674,8 @@ export default function MovimentacaoClientesProdutos() {
           )}
         </CardContent>
       </Card>
+
+      <AjudaModal open={ajudaOpen} onClose={() => setAjudaOpen(false)} />
     </div>
   );
 }
