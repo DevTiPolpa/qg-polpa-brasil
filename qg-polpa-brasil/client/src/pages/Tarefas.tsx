@@ -31,10 +31,84 @@ import {
   CheckCircle2,
   AlertTriangle,
   ExternalLink,
+  HelpCircle,
   X,
 } from "lucide-react";
 
 type FiltroKpi = TaskStatus | "VENCIDA" | null;
+
+// ─── Modal "Como funciona" ───────────────────────────────────────────────
+const PASSOS_COMO_FUNCIONA: { titulo: string; texto: string }[] = [
+  { titulo: "Identifique", texto: "Ao encontrar uma situação que precisa de acompanhamento em uma das telas de análise, crie uma tarefa." },
+  { titulo: "Defina o responsável", texto: "O usuário que cria a tarefa seleciona o responsável. Geralmente, o responsável será o gestor da conta." },
+  { titulo: "Registre o fato", texto: "O usuário que cria a tarefa deve fazer um resumo objetivo da situação identificada, explicando o que aconteceu e por que precisa de acompanhamento." },
+  { titulo: "Identifique a causa", texto: "O responsável pela tarefa deve investigar, identificar e detalhar a causa da situação." },
+  { titulo: "Registre a ação", texto: "O responsável deve informar as tratativas realizadas, ações planejadas e soluções encontradas para resolver ou tratar a situação." },
+  { titulo: "Acompanhe o prazo", texto: "Toda tarefa possui um prazo definido e deve ser cumprida dentro do período estabelecido. Tarefas fora do prazo ficam destacadas como Vencidas até sua conclusão ou alteração do prazo." },
+  { titulo: "Conclua", texto: "Após as tratativas e soluções serem realizadas, o responsável deve atualizar a tarefa para Concluída." },
+];
+
+const TELAS_ORIGEM_AJUDA = ["Movimentação de Clientes e Produtos", "Comparativo Semanal", "Recorrentes — Real x Orçado"];
+
+function PassoItem({ numero, titulo, texto }: { numero: number; titulo: string; texto: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="w-6 h-6 rounded-full bg-[oklch(0.65_0.20_145)] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+        {numero}
+      </div>
+      <div>
+        <h4 className="text-sm font-semibold text-foreground">{titulo}</h4>
+        <p className="text-sm text-muted-foreground mt-0.5">{texto}</p>
+      </div>
+    </div>
+  );
+}
+
+function AjudaModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-card border-border">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-foreground">Tarefas — Do problema à solução</DialogTitle>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            A tela de Tarefas transforma uma situação identificada nas análises em um plano de ação, com responsável e prazo definido.
+          </p>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          <section className="space-y-2">
+            <p className="text-sm text-muted-foreground">As tarefas podem ser criadas a partir de três telas de análise:</p>
+            <ul className="space-y-1">
+              {TELAS_ORIGEM_AJUDA.map(tela => (
+                <li key={tela} className="text-sm text-foreground font-medium flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[oklch(0.65_0.20_145)] shrink-0" />
+                  {tela}
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="space-y-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Como funciona</h3>
+            {PASSOS_COMO_FUNCIONA.map((passo, i) => (
+              <PassoItem key={passo.titulo} numero={i + 1} titulo={passo.titulo} texto={passo.texto} />
+            ))}
+          </section>
+
+          <section className="space-y-2 rounded-lg border border-border bg-background/40 p-4">
+            <h3 className="text-sm font-semibold text-foreground">🎯 Objetivo</h3>
+            <p className="text-sm text-muted-foreground">
+              A tela de Tarefas permite transformar informações identificadas nas análises em ações concretas, garantindo que cada situação tenha responsável, causa identificada, tratativa definida e prazo para resolução.
+            </p>
+          </section>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function KpiCard({ label, value, icon: Icon, iconClass, active, onClick }: {
   label: string; value: number; icon: ElementType; iconClass: string; active: boolean; onClick: () => void;
@@ -259,6 +333,7 @@ export default function Tarefas() {
   const [filtroKpi, setFiltroKpi] = useState<FiltroKpi>(null);
   const [responsaveisFiltro, setResponsaveisFiltro] = useState<string[]>([]);
   const [tarefaSelecionada, setTarefaSelecionada] = useState<number | null>(null);
+  const [ajudaOpen, setAjudaOpen] = useState(false);
 
   const searchParams = new URLSearchParams(search);
   const origemFiltro = searchParams.get("origem") ?? undefined;
@@ -315,6 +390,13 @@ export default function Tarefas() {
             Acompanhamento manual de variações identificadas nas análises
           </p>
         </div>
+        <button
+          onClick={() => setAjudaOpen(true)}
+          title="Como funciona"
+          className="w-9 h-9 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center shrink-0"
+        >
+          <HelpCircle className="w-4 h-4" />
+        </button>
       </div>
 
       <div className="flex items-center gap-4 flex-wrap">
@@ -398,6 +480,8 @@ export default function Tarefas() {
           onChanged={refetchTudo}
         />
       )}
+
+      <AjudaModal open={ajudaOpen} onClose={() => setAjudaOpen(false)} />
     </div>
   );
 }
