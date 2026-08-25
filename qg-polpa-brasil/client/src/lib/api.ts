@@ -1790,3 +1790,54 @@ export async function updateTask(id: number, payload: TaskUpdatePayload): Promis
     body: JSON.stringify(payload),
   })
 }
+
+// ============================================================
+// Comentários — histórico de anotações por linha em Comparativo Semanal,
+// Movimentação de Clientes e Produtos e Recorrentes R×O.
+// ============================================================
+
+export type ApiComentario = {
+  id: number
+  origem: TaskOrigem
+  codParc: number | null
+  razaoSocial: string | null
+  codProduto: number | null
+  nomeProduto: string | null
+  motivo: string
+  comentario: string
+  autorId: number
+  autorNome: string | null
+  createdAt: string | null
+}
+
+export type ComentarioFiltros = {
+  origem?: TaskOrigem
+  codParc?: number
+  codProduto?: number
+}
+
+export type ComentarioCreatePayload = {
+  origem: TaskOrigem
+  codParc?: number
+  razaoSocial?: string
+  codProduto?: number
+  nomeProduto?: string
+  motivo: string
+  comentario: string
+}
+
+export async function getComentarios(filtros: ComentarioFiltros = {}): Promise<ApiComentario[]> {
+  const params = new URLSearchParams()
+  if (filtros.origem) params.set('origem', filtros.origem)
+  if (filtros.codParc != null) params.set('codParc', String(filtros.codParc))
+  if (filtros.codProduto != null) params.set('codProduto', String(filtros.codProduto))
+  const query = params.toString()
+  return apiRequest<ApiComentario[]>(`/api/comentarios${query ? `?${query}` : ''}`)
+}
+
+export async function createComentario(payload: ComentarioCreatePayload): Promise<ApiComentario> {
+  return apiRequest<ApiComentario>('/api/comentarios', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}

@@ -11,7 +11,9 @@ import {
   type SnapshotProdutoRow,
 } from '../lib/api'
 import TarefaIndicador from '../components/TarefaIndicador'
+import ComentarioIndicador from '../components/ComentarioIndicador'
 import { useTarefasPorOrigem } from '../hooks/useTarefasPorOrigem'
+import { useComentariosPorOrigem } from '../hooks/useComentariosPorOrigem'
 import { TIPOS_OCORRENCIA_POR_ORIGEM } from '../lib/tarefas'
 
 const TIPOS_OCORRENCIA_SNAPSHOT = TIPOS_OCORRENCIA_POR_ORIGEM.COMPARATIVO_SEMANAL
@@ -22,6 +24,13 @@ function sugerirTipoOcorrencia(delta: number, valorSemanaAnterior: number): stri
 }
 
 const DEFAULT_FILTROS: Filtros = { dataInicio: '2026-01-01', dataFim: '2026-12-31' }
+
+// Quantidade de colunas de semana exibidas por padrão — evita que a tabela fique
+// cada vez mais larga (e com dados sobrepostos/scroll excessivo) à medida que mais
+// snapshots semanais se acumulam ao longo do tempo. "Todas" continua disponível.
+const OPCOES_JANELA_SEMANAS = [4, 6, 8, 'todas'] as const
+type JanelaSemanas = (typeof OPCOES_JANELA_SEMANAS)[number]
+const JANELA_SEMANAS_PADRAO: JanelaSemanas = 6
 
 const LINHAS_VISIVEIS = 25
 const ALTURA_LINHA_PX = 38
@@ -78,9 +87,10 @@ function ValCell({ valor, prev, highlight }: { valor: number; prev: number | nul
 }
 
 // Linha de cliente (expansível)
-function ClienteRow({ row, dates, filtros, contagemTarefas, onTarefaCriada }: {
+function ClienteRow({ row, dates, filtros, contagemTarefas, onTarefaCriada, contagemComentarios, onComentarioAdicionado }: {
   row: SnapshotClienteRow; dates: string[]; filtros: Filtros;
   contagemTarefas: (codParc?: number, codProduto?: number) => number; onTarefaCriada: () => void;
+  contagemComentarios: (codParc?: number, codProduto?: number) => number; onComentarioAdicionado: () => void;
 }) {
   const [expanded, setExpanded] = useState(false)
   const { data: detalhe } = useQuery({
@@ -134,8 +144,8 @@ function ClienteRow({ row, dates, filtros, contagemTarefas, onTarefaCriada }: {
           }
         </td>
 
-        {/* Tarefas */}
-        <td className="px-2 py-2 text-center whitespace-nowrap">
+        {/* Tarefas — fixada à direita (tabela fica muito larga com várias semanas) */}
+        <td className="px-2 py-2 text-center whitespace-nowrap sticky right-[90px] bg-slate-800 z-10 border-l border-slate-700/40">
           <TarefaIndicador
             origem="COMPARATIVO_SEMANAL"
             tiposOcorrencia={TIPOS_OCORRENCIA_SNAPSHOT}
@@ -145,6 +155,18 @@ function ClienteRow({ row, dates, filtros, contagemTarefas, onTarefaCriada }: {
             infoVariacao={`Forecast atual: ${formatCurrency(row.currValor)} · Semana anterior: ${formatCurrency(semanaAnteriorValor)} · Δ ${deltaTotal > 0 ? '+' : ''}${formatCurrency(deltaTotal)}`}
             contagem={contagemTarefas(row.codParc)}
             onCreated={onTarefaCriada}
+          />
+        </td>
+
+        {/* Comentários — fixada à direita */}
+        <td className="px-2 py-2 text-center whitespace-nowrap sticky right-0 bg-slate-800 z-10 border-l border-slate-700/40">
+          <ComentarioIndicador
+            origem="COMPARATIVO_SEMANAL"
+            motivos={TIPOS_OCORRENCIA_SNAPSHOT}
+            codParc={row.codParc}
+            razaoSocial={row.razaoSocial ?? undefined}
+            contagem={contagemComentarios(row.codParc)}
+            onAdded={onComentarioAdicionado}
           />
         </td>
       </tr>
@@ -179,7 +201,7 @@ function ClienteRow({ row, dates, filtros, contagemTarefas, onTarefaCriada }: {
                   </span>
               }
             </td>
-            <td className="px-2 py-1.5 text-center">
+            <td className="px-2 py-1.5 text-center sticky right-[90px] bg-slate-900/50 z-10 border-l border-slate-700/40">
               <TarefaIndicador
                 origem="COMPARATIVO_SEMANAL"
                 tiposOcorrencia={TIPOS_OCORRENCIA_SNAPSHOT}
@@ -193,6 +215,18 @@ function ClienteRow({ row, dates, filtros, contagemTarefas, onTarefaCriada }: {
                 onCreated={onTarefaCriada}
               />
             </td>
+            <td className="px-2 py-1.5 text-center sticky right-0 bg-slate-900/50 z-10 border-l border-slate-700/40">
+              <ComentarioIndicador
+                origem="COMPARATIVO_SEMANAL"
+                motivos={TIPOS_OCORRENCIA_SNAPSHOT}
+                codParc={row.codParc}
+                razaoSocial={row.razaoSocial ?? undefined}
+                codProduto={p.codProduto}
+                nomeProduto={p.nomeProduto ?? undefined}
+                contagem={contagemComentarios(row.codParc, p.codProduto)}
+                onAdded={onComentarioAdicionado}
+              />
+            </td>
           </tr>
         )
       })}
@@ -204,6 +238,7 @@ export default function SnapshotComparativo() {
   const [filtros, setFiltros] = useState<Filtros>(DEFAULT_FILTROS)
   const [ordemDesc, setOrdemDesc] = useState(true)
   const [apenasComVariacao, setApenasComVariacao] = useState(false)
+  const [janelaSemanas, setJanelaSemanas] = useState<JanelaSemanas>(JANELA_SEMANAS_PADRAO)
 
   const { data: info } = useQuery({
     queryKey: ['snapshot', 'datas'],
@@ -217,10 +252,19 @@ export default function SnapshotComparativo() {
   })
 
   const { contagem: contagemTarefas, refetch: refetchTarefas } = useTarefasPorOrigem('COMPARATIVO_SEMANAL')
+  const { contagem: contagemComentarios, refetch: refetchComentarios } = useComentariosPorOrigem('COMPARATIVO_SEMANAL')
 
-  const dates  = data?.dates ?? []
+  const datesCompletas = data?.dates ?? []
   const rows   = data?.rows  ?? []
-  const hasDates = dates.length > 0
+  const hasDates = datesCompletas.length > 0
+
+  // Janela de semanas exibidas na tabela — fatia sempre a partir do fim (mais recentes),
+  // preservando a última posição (semana imediatamente anterior ao "Atual") intacta,
+  // que é o que `deltaVsSemanaAnterior` usa como referência.
+  const dates = useMemo(
+    () => (janelaSemanas === 'todas' ? datesCompletas : datesCompletas.slice(-janelaSemanas)),
+    [datesCompletas, janelaSemanas]
+  )
 
   const rowsExibidas = useMemo(() => {
     let lista = rows
@@ -308,6 +352,29 @@ export default function SnapshotComparativo() {
               Apenas com variação
             </button>
 
+            {/* Janela de semanas — limita quantas colunas semanais aparecem de uma vez,
+                evitando que a tabela fique cada vez mais larga (e poluída) conforme os
+                snapshots se acumulam. "Atual" e histórico completo continuam disponíveis. */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-slate-500">Qtd de semanas visíveis na tela:</span>
+              <div className="flex items-center gap-0.5 bg-slate-700/60 border border-slate-600 rounded-md p-0.5">
+                {OPCOES_JANELA_SEMANAS.map(op => (
+                  <button
+                    key={String(op)}
+                    onClick={() => setJanelaSemanas(op)}
+                    className={`text-[11px] font-medium rounded px-2 py-1 transition-colors ${
+                      janelaSemanas === op
+                        ? 'bg-violet-500/30 text-violet-200'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-600/60'
+                    }`}
+                    title={op === 'todas' ? 'Mostrar todo o histórico de snapshots' : `Mostrar apenas as últimas ${op} semanas`}
+                  >
+                    {op === 'todas' ? 'Todas' : op}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <span className="ml-auto text-[11px] text-slate-500 flex items-center gap-1">
               <span className="w-2 h-2 rounded-sm bg-green-500/50" /> aumento vs. semana anterior
               <span className="w-2 h-2 rounded-sm bg-red-500/50 ml-2" /> redução
@@ -315,7 +382,7 @@ export default function SnapshotComparativo() {
           </div>
 
           <div className="overflow-auto" style={{ maxHeight: `${ALTURA_TABELA_PX}px` }}>
-            <table className="w-full text-xs" style={{ minWidth: `${280 + dates.length * 110 + 120 + 90 + 90}px` }}>
+            <table className="w-full text-xs" style={{ minWidth: `${280 + dates.length * 110 + 120 + 90 + 90 + 90}px` }}>
               <thead className="bg-slate-800 sticky top-0 z-20">
                 <tr className="border-b border-slate-700">
                   {/* Cliente */}
@@ -336,9 +403,13 @@ export default function SnapshotComparativo() {
                   <th className="text-right px-2 py-2.5 font-medium text-slate-400 w-[90px] border-l border-slate-700/40 whitespace-nowrap">
                     Variação
                   </th>
-                  {/* Tarefas */}
-                  <th className="text-center px-2 py-2.5 font-medium text-slate-400 w-[90px] whitespace-nowrap">
+                  {/* Tarefas — fixada à direita */}
+                  <th className="text-center px-2 py-2.5 font-medium text-slate-400 w-[90px] whitespace-nowrap sticky right-[90px] bg-slate-800 z-20 border-l border-slate-700/40">
                     Tarefas
+                  </th>
+                  {/* Comentários — fixada à direita */}
+                  <th className="text-center px-2 py-2.5 font-medium text-slate-400 w-[90px] whitespace-nowrap sticky right-0 bg-slate-800 z-20 border-l border-slate-700/40">
+                    Comentários
                   </th>
                 </tr>
 
@@ -390,7 +461,8 @@ export default function SnapshotComparativo() {
                           {Math.abs(totDelta) < 50 ? '—' : `${totDelta > 0 ? '+' : ''}${compact(totDelta)}`}
                         </span>
                       </td>
-                      <td className="px-2 py-2.5" />
+                      <td className="px-2 py-2.5 sticky right-[90px] bg-slate-700/60 z-20 border-l border-slate-600" />
+                      <td className="px-2 py-2.5 sticky right-0 bg-slate-700/60 z-20 border-l border-slate-600" />
                     </tr>
                   )
                 })()}
@@ -402,7 +474,7 @@ export default function SnapshotComparativo() {
                         <td className="px-3 py-2 sticky left-0 bg-slate-800 border-r border-slate-700/40">
                           <div className="h-3 bg-slate-700 rounded w-40" />
                         </td>
-                        {Array.from({ length: dates.length + 3 }).map((_, j) => (
+                        {Array.from({ length: dates.length + 4 }).map((_, j) => (
                           <td key={j} className="px-2 py-2">
                             <div className="h-3 bg-slate-700 rounded w-full" />
                           </td>
@@ -413,6 +485,7 @@ export default function SnapshotComparativo() {
                       <ClienteRow
                         key={row.codParc} row={row} dates={dates} filtros={filtros}
                         contagemTarefas={contagemTarefas} onTarefaCriada={refetchTarefas}
+                        contagemComentarios={contagemComentarios} onComentarioAdicionado={refetchComentarios}
                       />
                     ))
                 }

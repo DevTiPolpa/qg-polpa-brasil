@@ -16,7 +16,9 @@ import { Tabs } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import MultiSelect from "@/components/MultiSelect";
 import TarefaIndicador from "@/components/TarefaIndicador";
+import ComentarioIndicador from "@/components/ComentarioIndicador";
 import { useTarefasPorOrigem } from "@/hooks/useTarefasPorOrigem";
+import { useComentariosPorOrigem } from "@/hooks/useComentariosPorOrigem";
 import { TIPOS_OCORRENCIA_POR_ORIGEM } from "@/lib/tarefas";
 import { formatCurrency, formatKg, formatNumber, formatData } from "@/lib/utils";
 import { ArrowLeftRight, UserPlus, UserMinus, PackagePlus, PackageMinus, AlertTriangle, ChevronRight, ChevronDown, HelpCircle, X } from "lucide-react";
@@ -241,9 +243,10 @@ function ClientesDoProduto({ codProduto, ano, mercados, vendedores }: { codProdu
   );
 }
 
-function LinhaClienteAberto({ cliente, ano, mercados, vendedores, contagemTarefas, onTarefaCriada }: {
+function LinhaClienteAberto({ cliente, ano, mercados, vendedores, contagemTarefas, onTarefaCriada, contagemComentarios, onComentarioAdicionado }: {
   cliente: MovimentacaoClienteAberto; ano: number; mercados?: string[]; vendedores?: string[];
   contagemTarefas: number; onTarefaCriada: () => void;
+  contagemComentarios: number; onComentarioAdicionado: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -269,10 +272,20 @@ function LinhaClienteAberto({ cliente, ano, mercados, vendedores, contagemTarefa
             onCreated={onTarefaCriada}
           />
         </TableCell>
+        <TableCell>
+          <ComentarioIndicador
+            origem="MOVIMENTACAO_CLIENTES_PRODUTOS"
+            motivos={TIPOS_OCORRENCIA_MOVIMENTACAO}
+            codParc={cliente.codParc}
+            razaoSocial={cliente.razaoSocial}
+            contagem={contagemComentarios}
+            onAdded={onComentarioAdicionado}
+          />
+        </TableCell>
       </TableRow>
       {expanded && (
         <TableRow>
-          <TableCell colSpan={9} className="bg-background/40 py-0">
+          <TableCell colSpan={10} className="bg-background/40 py-0">
             <div className="pl-9 pr-2">
               <ProdutosDoCliente codParc={cliente.codParc} ano={ano} mercados={mercados} vendedores={vendedores} />
             </div>
@@ -283,9 +296,10 @@ function LinhaClienteAberto({ cliente, ano, mercados, vendedores, contagemTarefa
   );
 }
 
-function LinhaClientePerdido({ cliente, ano, mercados, vendedores, contagemTarefas, onTarefaCriada }: {
+function LinhaClientePerdido({ cliente, ano, mercados, vendedores, contagemTarefas, onTarefaCriada, contagemComentarios, onComentarioAdicionado }: {
   cliente: MovimentacaoClientePerdido; ano: number; mercados?: string[]; vendedores?: string[];
   contagemTarefas: number; onTarefaCriada: () => void;
+  contagemComentarios: number; onComentarioAdicionado: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -310,10 +324,20 @@ function LinhaClientePerdido({ cliente, ano, mercados, vendedores, contagemTaref
             onCreated={onTarefaCriada}
           />
         </TableCell>
+        <TableCell>
+          <ComentarioIndicador
+            origem="MOVIMENTACAO_CLIENTES_PRODUTOS"
+            motivos={TIPOS_OCORRENCIA_MOVIMENTACAO}
+            codParc={cliente.codParc}
+            razaoSocial={cliente.razaoSocial}
+            contagem={contagemComentarios}
+            onAdded={onComentarioAdicionado}
+          />
+        </TableCell>
       </TableRow>
       {expanded && (
         <TableRow>
-          <TableCell colSpan={8} className="bg-background/40 py-0">
+          <TableCell colSpan={9} className="bg-background/40 py-0">
             <div className="pl-9 pr-2">
               <ProdutosDoCliente codParc={cliente.codParc} ano={ano} mercados={mercados} vendedores={vendedores} />
             </div>
@@ -324,9 +348,10 @@ function LinhaClientePerdido({ cliente, ano, mercados, vendedores, contagemTaref
   );
 }
 
-function LinhaProduto({ produto, ano, mercados, vendedores, tipoOcorrencia, contagemTarefas, onTarefaCriada }: {
+function LinhaProduto({ produto, ano, mercados, vendedores, tipoOcorrencia, contagemTarefas, onTarefaCriada, contagemComentarios, onComentarioAdicionado }: {
   produto: MovimentacaoProduto; ano: number; mercados?: string[]; vendedores?: string[];
   tipoOcorrencia: "Produto Lançado" | "Produto Descontinuado"; contagemTarefas: number; onTarefaCriada: () => void;
+  contagemComentarios: number; onComentarioAdicionado: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -353,10 +378,20 @@ function LinhaProduto({ produto, ano, mercados, vendedores, tipoOcorrencia, cont
             onCreated={onTarefaCriada}
           />
         </TableCell>
+        <TableCell>
+          <ComentarioIndicador
+            origem="MOVIMENTACAO_CLIENTES_PRODUTOS"
+            motivos={TIPOS_OCORRENCIA_MOVIMENTACAO}
+            codProduto={produto.codProduto}
+            nomeProduto={produto.nomeProduto}
+            contagem={contagemComentarios}
+            onAdded={onComentarioAdicionado}
+          />
+        </TableCell>
       </TableRow>
       {expanded && (
         <TableRow>
-          <TableCell colSpan={10} className="bg-background/40 py-0">
+          <TableCell colSpan={11} className="bg-background/40 py-0">
             <div className="pl-9 pr-2">
               <ClientesDoProduto codProduto={produto.codProduto} ano={ano} mercados={mercados} vendedores={vendedores} />
             </div>
@@ -387,6 +422,7 @@ export default function MovimentacaoClientesProdutos() {
   const vendedoresDisponiveis = filtrosDisponiveis?.vendedores ?? [];
 
   const { contagem: contagemTarefas, refetch: refetchTarefas } = useTarefasPorOrigem("MOVIMENTACAO_CLIENTES_PRODUTOS");
+  const { contagem: contagemComentarios, refetch: refetchComentarios } = useComentariosPorOrigem("MOVIMENTACAO_CLIENTES_PRODUTOS");
 
   const { data: clientes, isLoading: loadingClientes, isError: erroClientes } = useQuery({
     queryKey: ["movimentacao-clientes", anoNum, mercadosFiltro, vendedoresFiltro],
@@ -517,14 +553,16 @@ export default function MovimentacaoClientesProdutos() {
                     <TableHead>Última Compra</TableHead>
                     <TableHead>Vendedor</TableHead>
                     <TableHead>Tarefas</TableHead>
+                    <TableHead>Comentários</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <LinhaEstado loading={loadingClientes} error={erroClientes} vazio={!loadingClientes && !erroClientes && abertos.length === 0} colSpan={9} />
+                  <LinhaEstado loading={loadingClientes} error={erroClientes} vazio={!loadingClientes && !erroClientes && abertos.length === 0} colSpan={10} />
                   {!loadingClientes && !erroClientes && abertos.map((c) => (
                     <LinhaClienteAberto
                       key={c.codParc} cliente={c} ano={anoNum} mercados={mercadosFiltro} vendedores={vendedoresFiltro}
                       contagemTarefas={contagemTarefas(c.codParc)} onTarefaCriada={refetchTarefas}
+                      contagemComentarios={contagemComentarios(c.codParc)} onComentarioAdicionado={refetchComentarios}
                     />
                   ))}
                   {!loadingClientes && !erroClientes && abertos.length > 0 && (
@@ -534,6 +572,7 @@ export default function MovimentacaoClientesProdutos() {
                       <CelulaTotal />
                       <CelulaTotal className="text-right">{formatCurrency(totalAbertos.faturamento)}</CelulaTotal>
                       <CelulaTotal className="text-right">{formatNumber(totalAbertos.pedidos)}</CelulaTotal>
+                      <CelulaTotal />
                       <CelulaTotal />
                       <CelulaTotal />
                       <CelulaTotal />
@@ -558,14 +597,16 @@ export default function MovimentacaoClientesProdutos() {
                     <TableHead>Última Compra</TableHead>
                     <TableHead>Vendedor</TableHead>
                     <TableHead>Tarefas</TableHead>
+                    <TableHead>Comentários</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <LinhaEstado loading={loadingClientes} error={erroClientes} vazio={!loadingClientes && !erroClientes && perdidos.length === 0} colSpan={8} />
+                  <LinhaEstado loading={loadingClientes} error={erroClientes} vazio={!loadingClientes && !erroClientes && perdidos.length === 0} colSpan={9} />
                   {!loadingClientes && !erroClientes && perdidos.map((c) => (
                     <LinhaClientePerdido
                       key={c.codParc} cliente={c} ano={anoAnterior} mercados={mercadosFiltro} vendedores={vendedoresFiltro}
                       contagemTarefas={contagemTarefas(c.codParc)} onTarefaCriada={refetchTarefas}
+                      contagemComentarios={contagemComentarios(c.codParc)} onComentarioAdicionado={refetchComentarios}
                     />
                   ))}
                   {!loadingClientes && !erroClientes && perdidos.length > 0 && (
@@ -575,6 +616,7 @@ export default function MovimentacaoClientesProdutos() {
                       <CelulaTotal />
                       <CelulaTotal className="text-right">{formatCurrency(totalPerdidos.faturamento)}</CelulaTotal>
                       <CelulaTotal className="text-right">{formatNumber(totalPerdidos.pedidos)}</CelulaTotal>
+                      <CelulaTotal />
                       <CelulaTotal />
                       <CelulaTotal />
                       <CelulaTotal />
@@ -600,14 +642,16 @@ export default function MovimentacaoClientesProdutos() {
                     <TableHead>1ª Venda</TableHead>
                     <TableHead>Última Venda</TableHead>
                     <TableHead>Tarefas</TableHead>
+                    <TableHead>Comentários</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <LinhaEstado loading={loadingProdutos} error={erroProdutos} vazio={!loadingProdutos && !erroProdutos && lancados.length === 0} colSpan={10} />
+                  <LinhaEstado loading={loadingProdutos} error={erroProdutos} vazio={!loadingProdutos && !erroProdutos && lancados.length === 0} colSpan={11} />
                   {!loadingProdutos && !erroProdutos && lancados.map((p) => (
                     <LinhaProduto
                       key={p.codProduto} produto={p} ano={anoNum} mercados={mercadosFiltro} vendedores={vendedoresFiltro}
                       tipoOcorrencia="Produto Lançado" contagemTarefas={contagemTarefas(undefined, p.codProduto)} onTarefaCriada={refetchTarefas}
+                      contagemComentarios={contagemComentarios(undefined, p.codProduto)} onComentarioAdicionado={refetchComentarios}
                     />
                   ))}
                   {!loadingProdutos && !erroProdutos && lancados.length > 0 && (
@@ -618,6 +662,7 @@ export default function MovimentacaoClientesProdutos() {
                       <CelulaTotal />
                       <CelulaTotal className="text-right">{formatKg(totalLancados.volume)}</CelulaTotal>
                       <CelulaTotal className="text-right">{formatCurrency(totalLancados.faturamento)}</CelulaTotal>
+                      <CelulaTotal />
                       <CelulaTotal />
                       <CelulaTotal />
                       <CelulaTotal />
@@ -644,14 +689,16 @@ export default function MovimentacaoClientesProdutos() {
                     <TableHead>1ª Venda</TableHead>
                     <TableHead>Última Venda</TableHead>
                     <TableHead>Tarefas</TableHead>
+                    <TableHead>Comentários</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <LinhaEstado loading={loadingProdutos} error={erroProdutos} vazio={!loadingProdutos && !erroProdutos && descontinuados.length === 0} colSpan={10} />
+                  <LinhaEstado loading={loadingProdutos} error={erroProdutos} vazio={!loadingProdutos && !erroProdutos && descontinuados.length === 0} colSpan={11} />
                   {!loadingProdutos && !erroProdutos && descontinuados.map((p) => (
                     <LinhaProduto
                       key={p.codProduto} produto={p} ano={anoAnterior} mercados={mercadosFiltro} vendedores={vendedoresFiltro}
                       tipoOcorrencia="Produto Descontinuado" contagemTarefas={contagemTarefas(undefined, p.codProduto)} onTarefaCriada={refetchTarefas}
+                      contagemComentarios={contagemComentarios(undefined, p.codProduto)} onComentarioAdicionado={refetchComentarios}
                     />
                   ))}
                   {!loadingProdutos && !erroProdutos && descontinuados.length > 0 && (
@@ -662,6 +709,7 @@ export default function MovimentacaoClientesProdutos() {
                       <CelulaTotal />
                       <CelulaTotal className="text-right">{formatKg(totalDescontinuados.volume)}</CelulaTotal>
                       <CelulaTotal className="text-right">{formatCurrency(totalDescontinuados.faturamento)}</CelulaTotal>
+                      <CelulaTotal />
                       <CelulaTotal />
                       <CelulaTotal />
                       <CelulaTotal />
