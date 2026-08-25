@@ -21,7 +21,7 @@ import {
   DollarSign, Percent, Weight, Tag, Package, Users,
   RefreshCw, X, ChevronDown, ChevronRight,
 } from 'lucide-react'
-import { formatMes } from '../lib/utils'
+import { formatMes, formatData } from '../lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 const DEFAULT_FILTROS: Filtros = { dataInicio: '2026-01-01', dataFim: '2026-12-31' }
@@ -263,7 +263,7 @@ function ProdutoRow({ p, codParc, baseFiltros, isSelected, isDimmed, onProductCl
         <td className="py-1.5 pr-4 text-right text-slate-300 whitespace-nowrap">{fmtTableNum(p.valor)}</td>
         <td className="py-1.5 pr-4 text-right text-slate-300">R$ {fmtNum(p.precoMedio, 2)}</td>
         <td className="py-1.5 text-right text-slate-400">
-          {p.dtUltimaCompra ? new Date(p.dtUltimaCompra).toLocaleDateString('pt-BR') : '—'}
+          {p.dtUltimaCompra ? formatData(p.dtUltimaCompra) : '—'}
         </td>
       </tr>
       {mensalExpanded && (
@@ -354,7 +354,7 @@ function ClienteRow({ c, rank, baseFiltros, isExpanded, onToggle, dimmed, select
         <td className="px-2 py-1.5 text-right text-slate-300">R$ {fmtNum(c.precoMedio, 2)}</td>
         <td className="px-2 py-1.5 text-right text-slate-300">{c.qtdProdutos}</td>
         <td className="px-2 py-1.5 text-right text-slate-400 whitespace-nowrap">
-          {c.ultimaCompra ? new Date(c.ultimaCompra).toLocaleDateString('pt-BR') : '—'}
+          {c.ultimaCompra ? formatData(c.ultimaCompra) : '—'}
         </td>
       </tr>
       {/* Expansion row — always rendered, altura controlada por CSS */}

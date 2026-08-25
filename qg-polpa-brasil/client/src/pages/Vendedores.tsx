@@ -7,7 +7,7 @@ import {
   type VendedoresOriginalResumo,
 } from '../lib/api'
 import FiltrosGlobais, { type Filtros } from '../components/FiltrosGlobais'
-import { formatCurrency, formatNumber, formatKg, formatMes } from '../lib/utils'
+import { formatCurrency, formatNumber, formatKg, formatMes, formatData } from '../lib/utils'
 import { TAILWIND, BORDER_L_COLOR } from '../lib/colors'
 import { ChevronRight, ChevronDown, ExternalLink, Target, DollarSign } from 'lucide-react'
 
@@ -211,7 +211,7 @@ function ProdutoRow({ codParc, p, filtros }: { codParc: number; p: any; filtros:
         <td className="px-2 py-1.5 text-green-500/80 text-[11px] text-right">{formatCurrency(Number(p.faturamento))}</td>
         <td className="px-2 py-1.5 text-slate-500 text-[11px] text-right">{Math.round(Number(p.volume)).toLocaleString('pt-BR')}</td>
         <td className="px-2 py-1.5 text-slate-500 text-[11px] text-right whitespace-nowrap">
-          {p.ultimaCompra ? new Date(p.ultimaCompra).toLocaleDateString('pt-BR') : '—'}
+          {p.ultimaCompra ? formatData(p.ultimaCompra) : '—'}
         </td>
         <td className="px-2 py-1.5" />
       </tr>
@@ -283,7 +283,7 @@ function ClienteRow({ c, filtros }: { c: any; filtros: Filtros }) {
         <td className="px-2 py-2 text-green-400 font-semibold text-right">{formatCurrency(Number(c.faturamento))}</td>
         <td className="px-2 py-2 text-slate-400 text-right">{Math.round(Number(c.volume)).toLocaleString('pt-BR')}</td>
         <td className="px-2 py-2 text-slate-400 text-right whitespace-nowrap">
-          {c.ultimaCompra ? new Date(c.ultimaCompra).toLocaleDateString('pt-BR') : '—'}
+          {c.ultimaCompra ? formatData(c.ultimaCompra) : '—'}
         </td>
         <td className="px-2 py-2 text-right">
           <button className="text-slate-500 hover:text-slate-300 transition-colors text-[10px] flex items-center gap-0.5 ml-auto">
