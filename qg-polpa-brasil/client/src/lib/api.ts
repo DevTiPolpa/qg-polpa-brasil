@@ -1695,7 +1695,7 @@ export async function getMovimentacaoProdutoClientes(codProduto: number, ano: nu
 
 export type TaskOrigem = 'COMPARATIVO_SEMANAL' | 'MOVIMENTACAO_CLIENTES_PRODUTOS' | 'RECORRENTES_RXO'
 export type TaskStatus = 'PENDENTE' | 'EM_ANALISE' | 'AGUARDANDO_RETORNO' | 'CONCLUIDA'
-export type TaskHistoryTipoEvento = 'CRIACAO' | 'RESPONSAVEL' | 'STATUS' | 'PRAZO' | 'CAUSA' | 'ACOES'
+export type TaskHistoryTipoEvento = 'CRIACAO' | 'RESPONSAVEL' | 'STATUS' | 'PRAZO' | 'CAUSA' | 'ACOES' | 'TIPO_OCORRENCIA'
 
 export type TaskHistoryEvent = {
   id: number
@@ -1760,6 +1760,9 @@ export type TaskUpdatePayload = {
   status?: TaskStatus
   causa?: string
   acoes?: string
+  // Só é aceito pelo backend se quem chama for o criador da tarefa e ela ainda
+  // estiver Pendente — nunca inclua este campo fora dessa condição.
+  tipoOcorrencia?: string
 }
 
 export async function getTasks(filtros: TaskFiltros = {}): Promise<ApiTask[]> {

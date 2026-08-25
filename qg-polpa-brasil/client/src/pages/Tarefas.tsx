@@ -16,8 +16,10 @@ import {
   VENCIDA_BADGE_CLASS,
   VENCIDA_LABEL,
   ORIGEM_LABEL,
+  TIPOS_OCORRENCIA_POR_ORIGEM,
   isVencida,
 } from "@/lib/tarefas";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -139,6 +141,7 @@ function StatusBadge({ task }: { task: ApiTask }) {
 
 function DetalheTarefa({ taskId, onClose, onChanged }: { taskId: number; onClose: () => void; onChanged: () => void }) {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
   const { data: task, isLoading, refetch } = useQuery({
     queryKey: ["task", taskId],
     queryFn: () => getTask(taskId),
@@ -154,6 +157,7 @@ function DetalheTarefa({ taskId, onClose, onChanged }: { taskId: number; onClose
   const [status, setStatus] = useState<TaskStatus>("PENDENTE");
   const [responsavelId, setResponsavelId] = useState<number | "">("");
   const [prazo, setPrazo] = useState("");
+  const [tipoOcorrencia, setTipoOcorrencia] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -164,9 +168,18 @@ function DetalheTarefa({ taskId, onClose, onChanged }: { taskId: number; onClose
     setStatus(task.status);
     setResponsavelId(task.responsavelId);
     setPrazo(task.prazo);
+    setTipoOcorrencia(task.tipoOcorrencia);
   }, [task]);
 
   const usuariosAtivos = usuarios.filter((u: ApiUser) => u.ativo);
+
+  // Tipo de Ocorrência só pode ser alterado por quem criou a tarefa, e só enquanto
+  // ela ainda está Pendente — usa o status persistido (task.status), não o rascunho
+  // local em edição, para bater exatamente com a regra validada no backend.
+  const podeEditarTipoOcorrencia = Boolean(task && user && task.criadoPorId === user.id && task.status === "PENDENTE");
+  const opcoesTipoOcorrencia = task
+    ? Array.from(new Set([...TIPOS_OCORRENCIA_POR_ORIGEM[task.origem], task.tipoOcorrencia]))
+    : [];
 
   async function handleSalvar() {
     if (!task) return;
@@ -179,6 +192,7 @@ function DetalheTarefa({ taskId, onClose, onChanged }: { taskId: number; onClose
         status,
         responsavelId: responsavelId === "" ? undefined : Number(responsavelId),
         prazo,
+        ...(podeEditarTipoOcorrencia ? { tipoOcorrencia } : {}),
       });
       await refetch();
       onChanged();
@@ -208,7 +222,21 @@ function DetalheTarefa({ taskId, onClose, onChanged }: { taskId: number; onClose
               <p className="text-muted-foreground"><span className="font-semibold text-foreground">Origem:</span> {ORIGEM_LABEL[task.origem]}</p>
               {task.razaoSocial && <p className="text-muted-foreground"><span className="font-semibold text-foreground">Cliente:</span> {task.razaoSocial}{task.codParc != null && <span> (Cód. {task.codParc})</span>}</p>}
               {task.nomeProduto && <p className="text-muted-foreground"><span className="font-semibold text-foreground">Produto:</span> {task.nomeProduto}{task.codProduto != null && <span> (Cód. {task.codProduto})</span>}</p>}
-              <p className="text-muted-foreground"><span className="font-semibold text-foreground">Tipo de Ocorrência:</span> {task.tipoOcorrencia}</p>
+              {podeEditarTipoOcorrencia ? (
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-foreground">Tipo de Ocorrência:</span>
+                  <select
+                    value={tipoOcorrencia}
+                    onChange={e => setTipoOcorrencia(e.target.value)}
+                    className="bg-background border border-border rounded-md px-2 py-1 text-xs text-foreground focus:outline-none focus:border-primary"
+                  >
+                    {opcoesTipoOcorrencia.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <span className="text-[10px] text-muted-foreground">(editável só enquanto Pendente)</span>
+                </div>
+              ) : (
+                <p className="text-muted-foreground"><span className="font-semibold text-foreground">Tipo de Ocorrência:</span> {task.tipoOcorrencia}</p>
+              )}
               {task.infoVariacao && <p className="text-muted-foreground"><span className="font-semibold text-foreground">Situação identificada:</span> {task.infoVariacao}</p>}
               {task.origemUrl && (
                 <button
