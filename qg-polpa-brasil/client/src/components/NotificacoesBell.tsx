@@ -1,8 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation } from 'wouter'
-import { Bell, Check } from 'lucide-react'
-import { getNotificacoes, marcarNotificacaoLida, marcarTodasNotificacoesLidas, type ApiNotificacao } from '../lib/api'
+import { Bell, Check, ClipboardList, AlertTriangle } from 'lucide-react'
+import { getNotificacoes, marcarNotificacaoLida, marcarTodasNotificacoesLidas, type ApiNotificacao, type NotificacaoTipo } from '../lib/api'
+
+const ICONE_POR_TIPO: Record<NotificacaoTipo, { Icon: typeof Bell; className: string }> = {
+  TAREFA_ATRIBUIDA: { Icon: ClipboardList, className: 'text-green-400' },
+  TAREFA_REATRIBUIDA: { Icon: ClipboardList, className: 'text-blue-400' },
+  TAREFA_VENCIDA: { Icon: AlertTriangle, className: 'text-red-400' },
+}
 
 // Timestamp vem do backend em UTC sem sufixo de fuso — mesmo ajuste já usado em
 // ComentariosModal/"Última Compra" (anexar "Z" antes de parsear).
@@ -91,22 +97,28 @@ export default function NotificacoesBell({ collapsed = false, dropdownAlign = 't
               <p className="text-sm text-slate-500 text-center py-6">Nenhuma notificação ainda.</p>
             )}
 
-            {notificacoes.map(n => (
-              <button
-                key={n.id}
-                onClick={() => abrirNotificacao(n)}
-                className={`block w-full text-left px-3 py-2.5 border-b border-slate-700/50 last:border-b-0 hover:bg-slate-700/50 transition ${!n.lida ? 'bg-slate-700/20' : ''}`}
-              >
-                <div className="flex items-start gap-2">
-                  {!n.lida && <span className="w-1.5 h-1.5 rounded-full bg-green-400 mt-1.5 shrink-0" />}
-                  <div className={`min-w-0 flex-1 ${n.lida ? 'pl-3.5' : ''}`}>
-                    <p className="text-xs font-semibold text-white truncate">{n.titulo}</p>
-                    <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{n.mensagem}</p>
-                    <p className="text-[10px] text-slate-500 mt-1">{formatDataHora(n.createdAt)}</p>
+            {notificacoes.map(n => {
+              const { Icon, className } = ICONE_POR_TIPO[n.tipo]
+              return (
+                <button
+                  key={n.id}
+                  onClick={() => abrirNotificacao(n)}
+                  className={`block w-full text-left px-3 py-2.5 border-b border-slate-700/50 last:border-b-0 hover:bg-slate-700/50 transition ${!n.lida ? 'bg-slate-700/20' : ''}`}
+                >
+                  <div className="flex items-start gap-2">
+                    <Icon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${className}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs font-semibold text-white truncate">{n.titulo}</p>
+                        {!n.lida && <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{n.mensagem}</p>
+                      <p className="text-[10px] text-slate-500 mt-1">{formatDataHora(n.createdAt)}</p>
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              )
+            })}
           </div>
         </>
       )}

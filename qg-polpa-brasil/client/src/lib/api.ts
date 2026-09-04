@@ -1799,7 +1799,7 @@ export async function updateTask(id: number, payload: TaskUpdatePayload): Promis
 // uma tarefa. Fase 1: só in-app (sino no menu), sem e-mail.
 // ============================================================
 
-export type NotificacaoTipo = 'TAREFA_ATRIBUIDA' | 'TAREFA_REATRIBUIDA'
+export type NotificacaoTipo = 'TAREFA_ATRIBUIDA' | 'TAREFA_REATRIBUIDA' | 'TAREFA_VENCIDA'
 
 export type ApiNotificacao = {
   id: number
