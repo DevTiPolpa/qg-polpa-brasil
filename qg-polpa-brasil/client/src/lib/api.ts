@@ -1794,6 +1794,11 @@ export async function updateTask(id: number, payload: TaskUpdatePayload): Promis
   })
 }
 
+// Só é aceito pelo backend se quem chama for o criador da tarefa.
+export async function deleteTask(id: number): Promise<void> {
+  await apiRequest(`/api/tasks/${id}`, { method: 'DELETE' })
+}
+
 // ============================================================
 // Notificações — avisa o responsável quando recebe (ou é reatribuído a)
 // uma tarefa. Fase 1: só in-app (sino no menu), sem e-mail.

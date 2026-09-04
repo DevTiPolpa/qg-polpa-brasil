@@ -5,6 +5,7 @@ import {
   getTasks,
   getTask,
   updateTask,
+  deleteTask,
   getUsers,
   type ApiTask,
   type ApiUser,
@@ -34,6 +35,7 @@ import {
   AlertTriangle,
   ExternalLink,
   HelpCircle,
+  Trash2,
   X,
 } from "lucide-react";
 
@@ -160,6 +162,7 @@ function DetalheTarefa({ taskId, onClose, onChanged }: { taskId: number; onClose
   const [tipoOcorrencia, setTipoOcorrencia] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [excluindo, setExcluindo] = useState(false);
 
   useEffect(() => {
     if (!task) return;
@@ -180,6 +183,24 @@ function DetalheTarefa({ taskId, onClose, onChanged }: { taskId: number; onClose
   const opcoesTipoOcorrencia = task
     ? Array.from(new Set([...TIPOS_OCORRENCIA_POR_ORIGEM[task.origem], task.tipoOcorrencia]))
     : [];
+  // Só quem criou a tarefa pode excluí-la — sem restrição de status (diferente do
+  // Tipo de Ocorrência, que só é editável enquanto Pendente).
+  const podeExcluir = Boolean(task && user && task.criadoPorId === user.id);
+
+  async function handleExcluir() {
+    if (!task) return;
+    if (!window.confirm("Excluir esta tarefa? Essa ação é permanente e remove todo o histórico dela.")) return;
+    setExcluindo(true);
+    setError("");
+    try {
+      await deleteTask(task.id);
+      onChanged();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao excluir tarefa.");
+      setExcluindo(false);
+    }
+  }
 
   async function handleSalvar() {
     if (!task) return;
@@ -209,7 +230,20 @@ function DetalheTarefa({ taskId, onClose, onChanged }: { taskId: number; onClose
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between gap-2 text-foreground">
             <span>Tarefa #{taskId}</span>
-            <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+            <div className="flex items-center gap-3">
+              {podeExcluir && (
+                <button
+                  type="button"
+                  onClick={handleExcluir}
+                  disabled={excluindo}
+                  title="Excluir tarefa"
+                  className="flex items-center gap-1 text-xs font-medium text-red-400 hover:text-red-300 disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> {excluindo ? "Excluindo..." : "Excluir"}
+                </button>
+              )}
+              <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+            </div>
           </DialogTitle>
         </DialogHeader>
 
