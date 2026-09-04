@@ -5,6 +5,7 @@ import {
   ChevronLeft, ChevronRight, FolderOpen, BarChart2, Target, Menu, X, MessageSquare, History, Gauge, ListChecks, ArrowLeftRight, ListTodo,
 } from 'lucide-react'
 import { logout } from '../lib/api'
+import NotificacoesBell from './NotificacoesBell'
 
 const menuGroups = [
   {
@@ -134,6 +135,7 @@ export default function DashboardLayout({ children, user }: Props) {
 
       {/* Footer */}
       <div className="border-t border-slate-700 p-3 space-y-1">
+        <NotificacoesBell collapsed={collapsed} dropdownAlign="top" />
         {!collapsed && (
           <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg">
             <div className="w-7 h-7 rounded-full bg-green-700 flex items-center justify-center shrink-0">
@@ -207,7 +209,10 @@ export default function DashboardLayout({ children, user }: Props) {
           <div className="w-7 h-7 rounded-lg bg-green-600 flex items-center justify-center">
             <span className="text-xs font-bold text-white">QB</span>
           </div>
-          <span className="font-bold text-white text-sm">QG Polpa Brasil</span>
+          <span className="font-bold text-white text-sm flex-1">QG Polpa Brasil</span>
+          <div className="w-8">
+            <NotificacoesBell collapsed dropdownAlign="bottom" />
+          </div>
         </div>
 
         <div className="w-full px-3 py-4 md:px-6 md:py-6">

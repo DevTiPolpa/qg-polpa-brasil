@@ -1795,6 +1795,36 @@ export async function updateTask(id: number, payload: TaskUpdatePayload): Promis
 }
 
 // ============================================================
+// Notificações — avisa o responsável quando recebe (ou é reatribuído a)
+// uma tarefa. Fase 1: só in-app (sino no menu), sem e-mail.
+// ============================================================
+
+export type NotificacaoTipo = 'TAREFA_ATRIBUIDA' | 'TAREFA_REATRIBUIDA'
+
+export type ApiNotificacao = {
+  id: number
+  tipo: NotificacaoTipo
+  taskId: number
+  titulo: string
+  mensagem: string
+  lida: boolean
+  createdAt: string | null
+}
+
+export async function getNotificacoes(apenasNaoLidas = false): Promise<ApiNotificacao[]> {
+  const query = apenasNaoLidas ? '?apenasNaoLidas=true' : ''
+  return apiRequest<ApiNotificacao[]>(`/api/notifications${query}`)
+}
+
+export async function marcarNotificacaoLida(id: number): Promise<void> {
+  await apiRequest(`/api/notifications/${id}/lida`, { method: 'PATCH' })
+}
+
+export async function marcarTodasNotificacoesLidas(): Promise<void> {
+  await apiRequest('/api/notifications/marcar-todas-lidas', { method: 'POST' })
+}
+
+// ============================================================
 // Comentários — histórico de anotações por linha em Comparativo Semanal,
 // Movimentação de Clientes e Produtos e Recorrentes R×O.
 // ============================================================

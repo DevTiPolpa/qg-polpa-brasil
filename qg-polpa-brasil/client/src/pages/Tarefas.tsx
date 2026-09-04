@@ -261,7 +261,7 @@ function DetalheTarefa({ taskId, onClose, onChanged }: { taskId: number; onClose
                 <textarea
                   value={causa}
                   onChange={e => setCausa(e.target.value)}
-                  rows={2}
+                  rows={6}
                   placeholder="Justificativa da situação identificada..."
                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
                 />
@@ -271,7 +271,7 @@ function DetalheTarefa({ taskId, onClose, onChanged }: { taskId: number; onClose
                 <textarea
                   value={acoes}
                   onChange={e => setAcoes(e.target.value)}
-                  rows={2}
+                  rows={6}
                   placeholder="Ações realizadas ou planejadas..."
                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
                 />
@@ -367,7 +367,13 @@ export default function Tarefas() {
   const origemFiltro = searchParams.get("origem") ?? undefined;
   const codParcFiltro = searchParams.get("codParc") ? Number(searchParams.get("codParc")) : undefined;
   const codProdutoFiltro = searchParams.get("codProduto") ? Number(searchParams.get("codProduto")) : undefined;
+  const taskIdParam = searchParams.get("taskId") ? Number(searchParams.get("taskId")) : undefined;
   const temFiltroLinha = Boolean(origemFiltro);
+
+  // Vindo de uma notificação (?taskId=), abre o detalhe direto ao carregar.
+  useEffect(() => {
+    if (taskIdParam != null) setTarefaSelecionada(taskIdParam);
+  }, [taskIdParam]);
 
   const { data: tarefas = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["tasks", origemFiltro, codParcFiltro, codProdutoFiltro],
