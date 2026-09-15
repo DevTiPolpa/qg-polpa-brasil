@@ -169,11 +169,11 @@ export default function Chat() {
     <div className="flex flex-col h-full">
       {/* Header mobile */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700 md:hidden">
-        <button onClick={() => setShowSidebar(true)} className="text-slate-400 hover:text-white">
+        <button onClick={() => setShowSidebar(true)} className="text-slate-400 hover:text-foreground">
           <ChevronLeft size={20} />
         </button>
         <Bot size={18} className="text-green-400" />
-        <span className="text-white text-sm font-medium">Agente IA</span>
+        <span className="text-foreground text-sm font-medium">Agente IA</span>
       </div>
 
       {/* Header desktop */}
@@ -182,7 +182,7 @@ export default function Chat() {
           <Bot size={16} className="text-white" />
         </div>
         <div>
-          <p className="text-white text-sm font-semibold">Agente IA</p>
+          <p className="text-foreground text-sm font-semibold">Agente IA</p>
           <p className="text-slate-400 text-xs">Faturamento + CRM Bitrix24 — SQL Server</p>
         </div>
       </div>
@@ -195,7 +195,7 @@ export default function Chat() {
               <Bot size={28} className="text-green-400" />
             </div>
             <div>
-              <p className="text-white font-semibold">Como posso ajudar?</p>
+              <p className="text-foreground font-semibold">Como posso ajudar?</p>
               <p className="text-slate-400 text-sm mt-1">Pergunte sobre faturamento, pipeline ou qualquer análise.</p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center max-w-lg">

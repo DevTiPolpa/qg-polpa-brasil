@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>QG Polpa Brasil</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Aplica o tema salvo antes do primeiro paint, pra não piscar o tema
+      // errado no reload. Sem preferência salva, o :root já É o tema escuro
+      // (nenhum atributo aplicado) — combina com "escuro é o padrão".
+      (function () {
+        try {
+          if (localStorage.getItem('qg-theme') === 'light') {
+            document.documentElement.dataset.theme = 'light'
+          }
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

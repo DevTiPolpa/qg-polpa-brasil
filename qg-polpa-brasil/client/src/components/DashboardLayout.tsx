@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { logout } from '../lib/api'
 import NotificacoesBell from './NotificacoesBell'
+import ThemeToggle from './ThemeToggle'
 
 const menuGroups = [
   {
@@ -77,13 +78,13 @@ export default function DashboardLayout({ children, user }: Props) {
   const sidebarContent = (
     <>
       {/* Logo */}
-      <div className="flex items-center h-14 md:h-16 px-4 border-b border-slate-700">
+      <div className="flex items-center h-14 md:h-16 px-4 border-b border-sidebar">
         {!collapsed && (
           <div className="flex items-center gap-2 overflow-hidden flex-1">
             <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center shrink-0">
               <span className="text-sm font-bold text-white">QB</span>
             </div>
-            <span className="font-bold text-white text-sm truncate">QG Polpa Brasil</span>
+            <span className="font-bold text-foreground text-sm truncate">QG Polpa Brasil</span>
           </div>
         )}
         {collapsed && (
@@ -94,7 +95,7 @@ export default function DashboardLayout({ children, user }: Props) {
         {/* Fechar no mobile */}
         <button
           onClick={() => setMobileOpen(false)}
-          className="ml-auto text-slate-400 hover:text-white md:hidden"
+          className="ml-auto text-slate-400 hover:text-foreground md:hidden"
         >
           <X size={18} />
         </button>
@@ -120,7 +121,7 @@ export default function DashboardLayout({ children, user }: Props) {
                       className={`flex items-center gap-3 w-full rounded-lg px-2 py-2 text-sm transition ${
                         active
                           ? 'bg-green-600/20 text-green-400'
-                          : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                          : 'text-slate-300 hover:bg-slate-700 hover:text-foreground'
                       } ${collapsed ? 'justify-center' : ''}`}
                     >
                       <item.icon size={18} className="shrink-0" />
@@ -135,7 +136,7 @@ export default function DashboardLayout({ children, user }: Props) {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-slate-700 p-3 space-y-1">
+      <div className="border-t border-sidebar p-3 space-y-1">
         <NotificacoesBell collapsed={collapsed} dropdownAlign="top" />
         {!collapsed && (
           <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg">
@@ -143,7 +144,7 @@ export default function DashboardLayout({ children, user }: Props) {
               <span className="text-xs font-bold text-white">{initials}</span>
             </div>
             <div className="overflow-hidden flex-1 min-w-0">
-              <p className="text-xs font-semibold text-white truncate">{user.name ?? user.email}</p>
+              <p className="text-xs font-semibold text-foreground truncate">{user.name ?? user.email}</p>
               <p className="text-xs text-slate-400">{user.role === 'ADMIN' ? 'Administrador' : 'Vendedor'}</p>
             </div>
           </div>
@@ -152,7 +153,7 @@ export default function DashboardLayout({ children, user }: Props) {
           onClick={handleLogout}
           disabled={isLoggingOut}
           title="Sair"
-          className={`flex items-center gap-2 w-full rounded-lg px-2 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-700 disabled:opacity-50 transition ${collapsed ? 'justify-center' : ''}`}
+          className={`flex items-center gap-2 w-full rounded-lg px-2 py-2 text-sm text-slate-400 hover:text-foreground hover:bg-slate-700 disabled:opacity-50 transition ${collapsed ? 'justify-center' : ''}`}
         >
           <LogOut size={16} />
           {!collapsed && <span>{isLoggingOut ? 'Saindo...' : 'Sair'}</span>}
@@ -160,7 +161,7 @@ export default function DashboardLayout({ children, user }: Props) {
         <button
           onClick={() => setCollapsed(c => !c)}
           title={collapsed ? 'Expandir' : 'Recolher'}
-          className={`hidden md:flex items-center gap-2 w-full rounded-lg px-2 py-2 text-sm text-slate-500 hover:text-white hover:bg-slate-700 transition ${collapsed ? 'justify-center' : ''}`}
+          className={`hidden md:flex items-center gap-2 w-full rounded-lg px-2 py-2 text-sm text-slate-500 hover:text-foreground hover:bg-slate-700 transition ${collapsed ? 'justify-center' : ''}`}
         >
           {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           {!collapsed && <span className="text-xs">Recolher</span>}
@@ -183,14 +184,14 @@ export default function DashboardLayout({ children, user }: Props) {
       {/* Sidebar desktop (permanente) */}
       <aside
         style={{ width: collapsed ? 64 : 240 }}
-        className="hidden md:flex flex-col bg-slate-800 border-r border-slate-700 transition-all duration-200 shrink-0"
+        className="hidden md:flex flex-col bg-sidebar border-r border-sidebar transition-all duration-200 shrink-0"
       >
         {sidebarContent}
       </aside>
 
       {/* Sidebar mobile (drawer) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col bg-slate-800 border-r border-slate-700 transition-transform duration-200 md:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col bg-sidebar border-r border-sidebar transition-transform duration-200 md:hidden ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -200,21 +201,25 @@ export default function DashboardLayout({ children, user }: Props) {
       {/* Main */}
       <main className="flex-1 overflow-y-auto min-w-0">
         {/* Header mobile */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700 bg-slate-800 md:hidden">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-sidebar bg-sidebar md:hidden">
           <button
             onClick={() => setMobileOpen(true)}
-            className="text-slate-400 hover:text-white transition-colors"
+            className="text-slate-400 hover:text-foreground transition-colors"
           >
             <Menu size={20} />
           </button>
           <div className="w-7 h-7 rounded-lg bg-green-600 flex items-center justify-center">
             <span className="text-xs font-bold text-white">QB</span>
           </div>
-          <span className="font-bold text-white text-sm flex-1">QG Polpa Brasil</span>
+          <span className="font-bold text-foreground text-sm flex-1">QG Polpa Brasil</span>
+          <ThemeToggle className="!bg-transparent !border-transparent" />
           <div className="w-8">
             <NotificacoesBell collapsed dropdownAlign="bottom" />
           </div>
         </div>
+
+        {/* Toggle de tema — canto superior direito, visível em toda tela autenticada */}
+        <ThemeToggle className="hidden md:flex fixed top-4 right-4 z-50 shadow-sm" />
 
         <div className="w-full px-3 py-4 md:px-6 md:py-6">
           {children}

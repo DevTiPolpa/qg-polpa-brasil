@@ -13,7 +13,7 @@ function Badge({ className, variant = "default", ...props }: BadgeProps) {
     outline: "text-foreground",
   }
   return (
-    <div className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors", variants[variant], className)} {...props} />
+    <div className={cn("inline-flex items-center rounded-full border border-border px-2.5 py-0.5 text-xs font-semibold transition-colors", variants[variant], className)} {...props} />
   )
 }
 

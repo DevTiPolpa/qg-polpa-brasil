@@ -40,7 +40,7 @@ export default function ChangePassword({ userName, onSuccess }: { userName: stri
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-green-600 mb-4">
             <span className="text-2xl font-bold text-white">QB</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Criar nova senha</h1>
+          <h1 className="text-2xl font-bold text-foreground">Criar nova senha</h1>
           <p className="text-slate-400 text-sm mt-1">Olá, {userName}! Por segurança, crie uma nova senha para continuar.</p>
         </div>
 
@@ -55,7 +55,7 @@ export default function ChangePassword({ userName, onSuccess }: { userName: stri
                 placeholder="Mínimo 6 caracteres"
                 required
                 minLength={6}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition"
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-foreground placeholder-slate-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition"
               />
             </div>
             <div>
@@ -66,7 +66,7 @@ export default function ChangePassword({ userName, onSuccess }: { userName: stri
                 onChange={e => setConfirm(e.target.value)}
                 placeholder="Repita a nova senha"
                 required
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition"
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-foreground placeholder-slate-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition"
               />
             </div>
 

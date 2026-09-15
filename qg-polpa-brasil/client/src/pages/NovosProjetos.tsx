@@ -18,6 +18,7 @@ import {
   FolderOpen, TrendingUp, RefreshCw, DollarSign, X, ChevronRight,
   ChevronDown, ArrowUpRight, Clock, Zap,
 } from 'lucide-react'
+import { useTheme } from '../hooks/useTheme'
 
 const DEFAULT_FILTROS: Filtros = { dataInicio: '2026-01-01', dataFim: '2026-12-31' }
 
@@ -88,7 +89,7 @@ function ClickableCard({ icon, label, value, sub, active, color, onClick }: Clic
       : active ? 'bg-amber-600/30' : 'bg-slate-700'
   const valueColor = active
     ? (color === 'blue' ? 'text-blue-300' : color === 'green' ? 'text-green-300' : 'text-amber-300')
-    : 'text-white'
+    : 'text-foreground'
 
   return (
     <button
@@ -119,7 +120,7 @@ function InfoCard({ icon, label, value, sub }: { icon: React.ReactNode; label: s
       </div>
       <div className="min-w-0">
         <p className="text-xs text-slate-400 truncate">{label}</p>
-        <p className="text-xl font-bold text-white leading-tight">{value}</p>
+        <p className="text-xl font-bold text-foreground leading-tight">{value}</p>
         <p className="text-xs text-slate-500">{sub}</p>
       </div>
     </div>
@@ -129,6 +130,7 @@ function InfoCard({ icon, label, value, sub }: { icon: React.ReactNode; label: s
 const queryOpts = { staleTime: 2 * 60 * 1000 }
 
 export default function NovosProjetos() {
+  const { theme } = useTheme()
   const [filtros, setFiltros] = useState<Filtros>(DEFAULT_FILTROS)
   const [selectedCard, setSelectedCard] = useState<'abertos' | null>(null)
   const [drilldownMes, setDrilldownMes] = useState<string | null>(null)
@@ -263,7 +265,7 @@ export default function NovosProjetos() {
         {/* PROJETOS por mês */}
         <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-white">PROJETOS</h3>
+            <h3 className="text-sm font-semibold text-foreground">PROJETOS</h3>
             {drilldownMes && (
               <button
                 onClick={() => setDrilldownMes(null)}
@@ -275,13 +277,13 @@ export default function NovosProjetos() {
           </div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={porMesChart} margin={{ top: 20, right: 8, left: 0, bottom: 0 }} onClick={handleBarClick} style={{ cursor: 'pointer' }}>
-              <XAxis dataKey="mesLabel" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-              <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} allowDecimals={false} domain={[0, (max: number) => Math.ceil(max * 1.15)]} />
+              <XAxis dataKey="mesLabel" tick={{ fill: theme === 'light' ? '#6B6F66' : '#94a3b8', fontSize: 11 }} />
+              <YAxis tick={{ fill: theme === 'light' ? '#6B6F66' : '#94a3b8', fontSize: 11 }} allowDecimals={false} domain={[0, (max: number) => Math.ceil(max * 1.15)]} />
               <Tooltip
                 cursor={{ fill: 'rgba(148, 163, 184, 0.08)' }}
-                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
-                itemStyle={{ color: '#ffffff' }}
-                labelStyle={{ color: '#ffffff' }}
+                contentStyle={{ background: 'var(--color-chart-tooltip-bg)', border: '1px solid var(--color-chart-tooltip-border)', borderRadius: 8, fontSize: 12 }}
+                itemStyle={{ color: 'var(--color-chart-tooltip-text)' }}
+                labelStyle={{ color: 'var(--color-chart-tooltip-text)' }}
                 formatter={(v: number, name: string) => [
                   name === 'Projetos' ? formatNumber(v) : formatCurrency(v),
                   name,
@@ -292,8 +294,8 @@ export default function NovosProjetos() {
                 <LabelList
                   dataKey="projetos"
                   position="top"
-                  fill="#ffffff"
-                  style={{ fill: '#ffffff' }}
+                  fill={theme === 'light' ? '#1E211D' : '#ffffff'}
+                  style={{ fill: theme === 'light' ? '#1E211D' : '#ffffff' }}
                   fontSize={11}
                   fontWeight={600}
                 />
@@ -311,15 +313,15 @@ export default function NovosProjetos() {
 
         {/* Faturamento mensal */}
         <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-white mb-3">Faturamento Mensal</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-3">Faturamento Mensal</h3>
           <p className="text-xs text-slate-500 mb-3">Faturamento de novos projetos (M1–M12) no período</p>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={porMesChart} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="mesLabel" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-              <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={v => formatCurrencyK(v)} />
+              <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#DEDED4' : '#334155'} />
+              <XAxis dataKey="mesLabel" tick={{ fill: theme === 'light' ? '#6B6F66' : '#94a3b8', fontSize: 11 }} />
+              <YAxis tick={{ fill: theme === 'light' ? '#6B6F66' : '#94a3b8', fontSize: 11 }} tickFormatter={v => formatCurrencyK(v)} />
               <Tooltip
-                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
+                contentStyle={{ background: 'var(--color-chart-tooltip-bg)', border: '1px solid var(--color-chart-tooltip-border)', borderRadius: 8, fontSize: 12 }}
                 formatter={(v: number) => [formatCurrency(v), 'Faturamento']}
                 labelFormatter={(l) => `Mês: ${l}`}
               />
@@ -336,7 +338,7 @@ export default function NovosProjetos() {
           <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <ChevronDown className="w-4 h-4 text-violet-400" />
-              <h3 className="text-sm font-semibold text-white">
+              <h3 className="text-sm font-semibold text-foreground">
                 Projetos com faturamento em{' '}
                 <span className="text-violet-300">{formatMes(drilldownMes)}</span>
               </h3>
@@ -344,7 +346,7 @@ export default function NovosProjetos() {
                 <span className="text-xs text-slate-500">({drilldown.length} projetos)</span>
               )}
             </div>
-            <button onClick={() => setDrilldownMes(null)} className="text-slate-500 hover:text-white transition-colors">
+            <button onClick={() => setDrilldownMes(null)} className="text-slate-500 hover:text-foreground transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -372,12 +374,12 @@ export default function NovosProjetos() {
                   {drilldown?.map(p => (
                     <tr key={`${p.codParc}-${p.codProduto}`} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors">
                       <td className="px-3 py-2 text-slate-500 text-xs font-mono">{p.codParc}</td>
-                      <td className="px-3 py-2 text-white text-xs font-medium max-w-[140px] truncate">{p.razaoSocial}</td>
+                      <td className="px-3 py-2 text-foreground text-xs font-medium max-w-[140px] truncate">{p.razaoSocial}</td>
                       <td className="px-3 py-2 text-slate-500 text-xs font-mono">{p.codProduto}</td>
                       <td className="px-3 py-2 text-slate-300 text-xs max-w-[130px] truncate">{p.nomeProduto}</td>
                       <td className="px-3 py-2 text-slate-400 text-xs">{p.dtPrimeiro ? formatMes(p.dtPrimeiro) : '—'}</td>
                       <td className="px-3 py-2 text-slate-400 text-xs">{p.ultimaCompra ? p.ultimaCompra.substring(0, 7) : '—'}</td>
-                      <td className="px-3 py-2 text-right text-white text-xs font-medium">{formatCurrency(Number(p.faturamentoTotal))}</td>
+                      <td className="px-3 py-2 text-right text-foreground text-xs font-medium">{formatCurrency(Number(p.faturamentoTotal))}</td>
                       <td className="px-3 py-2 text-center">
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${cycleColor(p.mesAtualCiclo)}`}>
                           {labelMesCiclo(p.mesAtualCiclo)}
@@ -403,12 +405,12 @@ export default function NovosProjetos() {
           <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <RefreshCw className="w-4 h-4 text-amber-400" />
-              <h3 className="text-sm font-semibold text-white">Projetos que se tornaram Recorrentes (M13+)</h3>
+              <h3 className="text-sm font-semibold text-foreground">Projetos que se tornaram Recorrentes (M13+)</h3>
               {recorrentesConvertidos && (
                 <span className="text-xs text-slate-500">({recorrentesConvertidos.length})</span>
               )}
             </div>
-            <button onClick={() => setShowRecorrentesPanel(false)} className="text-slate-500 hover:text-white transition-colors">
+            <button onClick={() => setShowRecorrentesPanel(false)} className="text-slate-500 hover:text-foreground transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -434,11 +436,11 @@ export default function NovosProjetos() {
                   {recorrentesConvertidos.map(p => (
                     <tr key={`${p.codParc}-${p.codProduto}`} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors">
                       <td className="px-3 py-2 text-slate-500 text-xs font-mono">{p.codParc}</td>
-                      <td className="px-3 py-2 text-white text-xs font-medium max-w-[180px] truncate">{p.razaoSocial}</td>
+                      <td className="px-3 py-2 text-foreground text-xs font-medium max-w-[180px] truncate">{p.razaoSocial}</td>
                       <td className="px-3 py-2 text-slate-500 text-xs font-mono">{p.codProduto}</td>
                       <td className="px-3 py-2 text-slate-300 text-xs max-w-[180px] truncate">{p.nomeProduto}</td>
                       <td className="px-3 py-2 text-slate-400 text-xs">{p.dtPrimeiro ? formatMes(p.dtPrimeiro) : '—'}</td>
-                      <td className="px-3 py-2 text-right text-white text-xs font-medium">{formatCurrency(Number(p.faturamentoTotal))}</td>
+                      <td className="px-3 py-2 text-right text-foreground text-xs font-medium">{formatCurrency(Number(p.faturamentoTotal))}</td>
                       <td className="px-3 py-2 text-center">
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${cycleColor(p.mesAtualCiclo)}`}>
                           {labelMesCiclo(p.mesAtualCiclo)}
@@ -457,7 +459,7 @@ export default function NovosProjetos() {
       <div className="bg-slate-800 border border-slate-700 rounded-xl">
         <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-white">PROJETOS</h3>
+            <h3 className="text-sm font-semibold text-foreground">PROJETOS</h3>
             {listaFiltrada.length > 0 && (
               <span className="text-xs text-slate-500">({listaFiltrada.length})</span>
             )}
@@ -466,7 +468,7 @@ export default function NovosProjetos() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar cliente, produto ou código..."
-            className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 w-64"
+            className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-foreground placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 w-64"
           />
         </div>
         <div className="overflow-auto" style={{ maxHeight: ALTURA_TABELA_PX }}>
@@ -506,13 +508,13 @@ export default function NovosProjetos() {
                     className={`border-b border-slate-700/50 transition-colors ${rowHighlight}`}
                   >
                     <td className="px-3 py-2.5 text-slate-500 text-xs font-mono">{p.codParc}</td>
-                    <td className="px-3 py-2.5 text-white font-medium text-xs max-w-[150px] truncate">{p.razaoSocial}</td>
+                    <td className="px-3 py-2.5 text-foreground font-medium text-xs max-w-[150px] truncate">{p.razaoSocial}</td>
                     <td className="px-3 py-2.5 text-slate-500 text-xs font-mono">{p.codProduto}</td>
                     <td className="px-3 py-2.5 text-slate-300 text-xs max-w-[140px] truncate">{p.nomeProduto}</td>
                     <td className="px-3 py-2.5 text-slate-400 text-xs">{p.dtPrimeiro ? formatMes(p.dtPrimeiro) : '—'}</td>
                     <td className="px-3 py-2.5 text-slate-400 text-xs">{p.ultimaCompra ? p.ultimaCompra.substring(0, 7) : '—'}</td>
                     <td className="px-3 py-2.5 text-right text-slate-300 text-xs">{formatKg(Number(p.volumeTotal))}</td>
-                    <td className="px-3 py-2.5 text-right text-white text-xs font-medium">{formatCurrency(Number(p.faturamentoTotal))}</td>
+                    <td className="px-3 py-2.5 text-right text-foreground text-xs font-medium">{formatCurrency(Number(p.faturamentoTotal))}</td>
                     <td className="px-3 py-2.5 text-center">
                       <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${cycleColor(p.mesAtualCiclo)}`}>
                         {labelMesCiclo(p.mesAtualCiclo)}

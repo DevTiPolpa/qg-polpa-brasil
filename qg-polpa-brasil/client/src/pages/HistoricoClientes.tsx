@@ -22,6 +22,7 @@ import {
   RefreshCw, X, ChevronDown, ChevronRight,
 } from 'lucide-react'
 import { formatMes, formatData } from '../lib/utils'
+import { useTheme } from '../hooks/useTheme'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 const DEFAULT_FILTROS: Filtros = { dataInicio: '2026-01-01', dataFim: '2026-12-31' }
@@ -91,7 +92,7 @@ function KpiCard({ icon: Icon, label, value, sub, color = 'text-green-400' }: {
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-[11px] text-slate-400 uppercase tracking-wide leading-none mb-1">{label}</p>
-        <p className="text-lg font-bold text-white leading-tight">{value}</p>
+        <p className="text-lg font-bold text-foreground leading-tight">{value}</p>
         {sub && <p className="text-[10px] text-slate-500 mt-0.5">{sub}</p>}
       </div>
     </div>
@@ -103,9 +104,9 @@ function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs shadow-xl">
-      <p className="font-semibold text-white mb-1">{label}</p>
+      <p className="font-semibold text-foreground mb-1">{label}</p>
       {payload.map((p: any) => (
-        <p key={p.name} className="text-white">
+        <p key={p.name} className="text-foreground">
           {p.name}: {typeof p.value === 'number' && p.value > 1000 ? fmtNum(p.value, 0) : fmtNum(p.value)}
         </p>
       ))}
@@ -124,6 +125,7 @@ function DonutPanel({ title, data, total, selectedName, onSliceClick, colors, va
   valueFormatter?: (v: number) => string
   metricLabel?: string
 }) {
+  const { theme } = useTheme()
   const [showAll, setShowAll] = useState(false)
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const shown = showAll ? data : data.slice(0, 6)
@@ -134,7 +136,7 @@ function DonutPanel({ title, data, total, selectedName, onSliceClick, colors, va
     <div className={`bg-slate-800 border rounded-xl overflow-hidden transition-colors ${hasSelection ? 'border-green-600/50' : 'border-slate-700'}`}>
       <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <p className="text-sm font-semibold text-white truncate">{title}</p>
+          <p className="text-sm font-semibold text-foreground truncate">{title}</p>
           {metricLabel && (
             <span
               className="text-[10px] font-medium px-1.5 py-0.5 rounded border shrink-0"
@@ -171,7 +173,7 @@ function DonutPanel({ title, data, total, selectedName, onSliceClick, colors, va
                   key={i}
                   fill={colors[i % colors.length]}
                   opacity={hasSelection && selectedName !== d.name ? 0.3 : 1}
-                  stroke={selectedName === d.name ? '#fff' : 'none'}
+                  stroke={selectedName === d.name ? (theme === 'light' ? '#1E211D' : '#ffffff') : 'none'}
                   strokeWidth={selectedName === d.name ? 1.5 : 0}
                 />
               ))}
@@ -181,13 +183,13 @@ function DonutPanel({ title, data, total, selectedName, onSliceClick, colors, va
             {hovered ? (
               <>
                 <p className="text-[10px] text-slate-400 leading-none truncate">{hovered.name}</p>
-                <p className="text-xs font-bold text-white mt-0.5">{valueFormatter(hovered.valor)}</p>
+                <p className="text-xs font-bold text-foreground mt-0.5">{valueFormatter(hovered.valor)}</p>
                 <p className="text-[10px] text-slate-400 mt-0.5">{fmtNum(hovered.pct, 1)}%</p>
               </>
             ) : (
               <>
                 <p className="text-[10px] text-slate-400 leading-none">{hasSelection ? 'Filtrado' : 'Total'}</p>
-                <p className="text-xs font-bold text-white mt-0.5">{valueFormatter(total)}</p>
+                <p className="text-xs font-bold text-foreground mt-0.5">{valueFormatter(total)}</p>
               </>
             )}
           </div>
@@ -206,14 +208,14 @@ function DonutPanel({ title, data, total, selectedName, onSliceClick, colors, va
               <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: colors[i % colors.length] }} />
               <span className="flex-1 text-[11px] text-slate-300 truncate">{d.name}</span>
               <span className="text-[11px] text-slate-400 shrink-0">{fmtNum(d.pct, 1)}%</span>
-              <span className="text-[11px] font-medium text-white shrink-0 min-w-[60px] text-right">{valueFormatter(d.valor)}</span>
+              <span className="text-[11px] font-medium text-foreground shrink-0 min-w-[60px] text-right">{valueFormatter(d.valor)}</span>
             </div>
           ))}
         </div>
         {data.length > 6 && (
           <button
             onClick={() => setShowAll(s => !s)}
-            className="w-full mt-3 pt-2 border-t border-slate-700 text-[10px] text-slate-400 hover:text-white flex items-center justify-center gap-1"
+            className="w-full mt-3 pt-2 border-t border-slate-700 text-[10px] text-slate-400 hover:text-foreground flex items-center justify-center gap-1"
           >
             <ChevronDown className={`w-3 h-3 transition-transform ${showAll ? 'rotate-180' : ''}`} />
             {showAll ? 'Ver menos' : `Ver todos (${data.length})`}
@@ -251,14 +253,14 @@ function ProdutoRow({ p, codParc, baseFiltros, isSelected, isDimmed, onProductCl
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setMensalExpanded(v => !v) }}
-            className="text-slate-500 hover:text-white transition-colors"
+            className="text-slate-500 hover:text-foreground transition-colors"
             title="Ver detalhamento mensal"
           >
             <ChevronRight className={`w-3 h-3 transition-transform ${mensalExpanded ? 'rotate-90' : ''}`} />
           </button>
         </td>
         <td className={`py-1.5 pr-4 ${isSelected ? 'text-violet-300' : 'text-slate-400'}`}>{p.codProduto}</td>
-        <td className={`py-1.5 pr-4 font-medium max-w-[220px] truncate ${isSelected ? 'text-violet-200' : 'text-white'}`}>{p.nomeProduto}</td>
+        <td className={`py-1.5 pr-4 font-medium max-w-[220px] truncate ${isSelected ? 'text-violet-200' : 'text-foreground'}`}>{p.nomeProduto}</td>
         <td className="py-1.5 pr-4 text-right text-slate-300 whitespace-nowrap">{fmtTableNum(p.volume)}</td>
         <td className="py-1.5 pr-4 text-right text-slate-300 whitespace-nowrap">{fmtTableNum(p.valor)}</td>
         <td className="py-1.5 pr-4 text-right text-slate-300">R$ {fmtNum(p.precoMedio, 2)}</td>
@@ -269,7 +271,7 @@ function ProdutoRow({ p, codParc, baseFiltros, isSelected, isDimmed, onProductCl
       {mensalExpanded && (
         <tr>
           <td colSpan={7} className="p-0">
-            <div className="bg-slate-950/40 border-b border-slate-800/60 pl-10 pr-4 py-2">
+            <div className="bg-slate-900/60 border-b border-slate-800/60 pl-10 pr-4 py-2">
               {mensalLoading ? (
                 <p className="text-slate-500 text-[11px] py-1">Carregando...</p>
               ) : !mensal?.length ? (
@@ -342,7 +344,7 @@ function ClienteRow({ c, rank, baseFiltros, isExpanded, onToggle, dimmed, select
               }`}
             />
             <div>
-              <p className="font-medium text-white truncate max-w-[240px]">{c.razaoSocial}</p>
+              <p className="font-medium text-foreground truncate max-w-[240px]">{c.razaoSocial}</p>
               <p className="text-[10px] text-slate-500">{c.codParc}</p>
             </div>
           </div>
@@ -435,6 +437,7 @@ function withMonth(b: HistoricoClientesFiltros, mes: number | null): HistoricoCl
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function HistoricoClientes() {
+  const { theme } = useTheme()
   const [filtros, setFiltros] = useState<Filtros>(DEFAULT_FILTROS)
   const [projetosAtivos, setProjetosAtivos] = useState<string[]>([])
   const [updatedAt, setUpdatedAt] = useState(() => new Date())
@@ -644,7 +647,7 @@ export default function HistoricoClientes() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Users className="w-6 h-6 text-green-400" />
             Histórico Clientes / Produtos
           </h1>
@@ -672,7 +675,7 @@ export default function HistoricoClientes() {
               className={`px-3 py-1 rounded-md text-xs font-medium border transition-colors ${
                 isActive
                   ? 'bg-green-600 border-green-500 text-white'
-                  : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-slate-400 hover:text-white'
+                  : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-slate-400 hover:text-foreground'
               }`}
             >
               {p}
@@ -739,7 +742,7 @@ export default function HistoricoClientes() {
       <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between flex-wrap gap-3">
           <div>
-            <p className="text-sm font-semibold text-white">Evolução Mensal</p>
+            <p className="text-sm font-semibold text-foreground">Evolução Mensal</p>
             <div className="flex items-center gap-3 mt-1">
               <span className="flex items-center gap-1 text-[10px] text-slate-400">
                 <span className="w-2.5 h-2.5 rounded-sm" style={{ background: evolucaoConfig.color }} /> {evolucaoConfig.legendLabel}
@@ -755,7 +758,7 @@ export default function HistoricoClientes() {
                 key={v}
                 onClick={() => setEvolucaoView(v)}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                  evolucaoView === v ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'
+                  evolucaoView === v ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-foreground'
                 }`}
               >
                 {v === 'faturamento' ? 'Faturamento' : 'Volume'}
@@ -766,10 +769,10 @@ export default function HistoricoClientes() {
         <div className="p-3">
           <ResponsiveContainer width="100%" height={280}>
             <ComposedChart data={evolucaoChart} margin={{ top: 4, right: 8, bottom: 0, left: -10 }}>
-              <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <YAxis yAxisId="main" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false}
+              <XAxis dataKey="name" tick={{ fontSize: 9, fill: theme === 'light' ? '#6B6F66' : '#94a3b8' }} axisLine={false} tickLine={false} />
+              <YAxis yAxisId="main" tick={{ fontSize: 9, fill: theme === 'light' ? '#6B6F66' : '#94a3b8' }} axisLine={false} tickLine={false}
                 tickFormatter={evolucaoConfig.tickFormatter} />
-              <YAxis yAxisId="pm" orientation="right" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false}
+              <YAxis yAxisId="pm" orientation="right" tick={{ fontSize: 9, fill: theme === 'light' ? '#6B6F66' : '#94a3b8' }} axisLine={false} tickLine={false}
                 tickFormatter={v => `R$${v.toFixed(0)}`} />
               <Tooltip content={<ChartTooltip />} />
               <Bar yAxisId="main" dataKey={evolucaoConfig.dataKey} name={evolucaoConfig.name} fill={evolucaoConfig.color} radius={[3, 3, 0, 0]}
@@ -780,7 +783,7 @@ export default function HistoricoClientes() {
                 ))}
               </Bar>
               <Line yAxisId="pm" type="monotone" dataKey="precoMedio" name="Preço Médio R$"
-                stroke="#ffffff" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+                stroke={theme === 'light' ? '#1E211D' : '#ffffff'} strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -796,7 +799,7 @@ export default function HistoricoClientes() {
                 {productCrossFilter !== null && <> · Produto: <strong>{productCrossFilter.name}</strong></>}
                 {' '}— KPIs, evolução e donuts mostrando apenas este contexto
               </span>
-              <button onClick={() => toggleCliente(expandedParc)} className="ml-auto flex items-center gap-1 hover:text-white">
+              <button onClick={() => toggleCliente(expandedParc)} className="ml-auto flex items-center gap-1 hover:text-foreground">
                 <X className="w-3 h-3" /> Limpar
               </button>
             </div>
@@ -804,7 +807,7 @@ export default function HistoricoClientes() {
           {monthCrossFilter !== null && (
             <div className="flex-1 text-[11px] bg-amber-900/40 text-amber-400 border border-amber-700/50 px-3 py-2 rounded-lg flex items-center gap-2">
               <span>Mês: <strong>{MESES_FULL[monthCrossFilter - 1]}</strong> — filtrando todos os painéis</span>
-              <button onClick={() => setMonthCrossFilter(null)} className="ml-auto flex items-center gap-1 hover:text-white">
+              <button onClick={() => setMonthCrossFilter(null)} className="ml-auto flex items-center gap-1 hover:text-foreground">
                 <X className="w-3 h-3" /> Limpar
               </button>
             </div>
@@ -815,18 +818,18 @@ export default function HistoricoClientes() {
       {/* Clients Table — largura total */}
       <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-3 flex-wrap">
-          <p className="text-sm font-semibold text-white">Clientes</p>
+          <p className="text-sm font-semibold text-foreground">Clientes</p>
           <span className="text-xs text-slate-500">{clientes?.length ?? 0} clientes</span>
           {expandedParc && (
             <span className="ml-auto text-[11px] bg-green-900/40 text-green-400 border border-green-700/50 px-2 py-0.5 rounded-full flex items-center gap-1">
               Tela filtrada por este cliente
-              <button onClick={() => toggleCliente(expandedParc)} className="hover:text-white"><X className="w-3 h-3" /></button>
+              <button onClick={() => toggleCliente(expandedParc)} className="hover:text-foreground"><X className="w-3 h-3" /></button>
             </span>
           )}
           {crossFilter && (
             <span className="ml-auto text-[11px] bg-blue-900/40 text-blue-400 border border-blue-700/50 px-2 py-0.5 rounded-full flex items-center gap-1">
               Filtrando por {crossFilter.type === 'uf' ? 'Estado' : crossFilter.type === 'segmento' ? 'Segmento' : 'Perfil'}: {crossFilter.value}
-              <button onClick={() => setCrossFilter(null)} className="hover:text-white"><X className="w-3 h-3" /></button>
+              <button onClick={() => setCrossFilter(null)} className="hover:text-foreground"><X className="w-3 h-3" /></button>
             </span>
           )}
         </div>
@@ -872,11 +875,11 @@ export default function HistoricoClientes() {
                 <tr className="border-t-2 border-slate-600 bg-slate-700/40">
                   <td className="px-3 py-2" />
                   <td className="px-3 py-2 text-xs font-bold text-slate-300">Total</td>
-                  <td className="px-2 py-2 text-right text-xs font-bold text-white whitespace-nowrap">{fmtTableNum(clientesTotal.valor)}</td>
+                  <td className="px-2 py-2 text-right text-xs font-bold text-foreground whitespace-nowrap">{fmtTableNum(clientesTotal.valor)}</td>
                   <td className="px-2 py-2 text-right text-xs text-slate-400">100%</td>
-                  <td className="px-2 py-2 text-right text-xs font-bold text-white whitespace-nowrap">{fmtTableNum(clientesTotal.volume)}</td>
+                  <td className="px-2 py-2 text-right text-xs font-bold text-foreground whitespace-nowrap">{fmtTableNum(clientesTotal.volume)}</td>
                   <td className="px-2 py-2 text-right text-xs text-slate-400">100%</td>
-                  <td className="px-2 py-2 text-right text-xs font-semibold text-white">
+                  <td className="px-2 py-2 text-right text-xs font-semibold text-foreground">
                     R$ {clientesTotal.volume > 0 ? fmtNum(clientesTotal.valor / clientesTotal.volume, 2) : '—'}
                   </td>
                   <td className="px-2 py-2 text-right text-xs text-slate-400">{kpis?.qtdProdutos ?? '—'}</td>

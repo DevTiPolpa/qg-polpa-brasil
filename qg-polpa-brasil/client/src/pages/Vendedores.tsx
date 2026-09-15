@@ -10,6 +10,7 @@ import FiltrosGlobais, { type Filtros } from '../components/FiltrosGlobais'
 import { formatCurrency, formatNumber, formatKg, formatMes, formatData } from '../lib/utils'
 import { TAILWIND, BORDER_L_COLOR } from '../lib/colors'
 import { ChevronRight, ChevronDown, ExternalLink, Target, DollarSign } from 'lucide-react'
+import { useTheme } from '../hooks/useTheme'
 
 const SPARKLINE_COLOR: Record<string, string> = {
   VENDA_FIRME: '#22c55e',
@@ -45,6 +46,7 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
 }
 
 function ProjetoDonut({ projetos, projetosAtivos }: { projetos: Array<{ projeto: string; faturamento: number }>; projetosAtivos: string[] }) {
+  const { theme } = useTheme()
   const CORES = ['#22c55e', '#f97316', '#3b82f6', '#a855f7', '#14b8a6', '#ec4899']
   const total = projetos.reduce((s, p) => s + Number(p.faturamento), 0)
   if (total === 0 || projetos.length === 0) return null
@@ -76,14 +78,15 @@ function ProjetoDonut({ projetos, projetosAtivos }: { projetos: Array<{ projeto:
     <div className="flex flex-col items-center shrink-0">
       <svg width="92" height="92">
         {segs.map((s, i) => arc(s.start, s.span, s.color, s.dimmed))}
-        <text x={cx} y={cy - 5} textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">{label}</text>
-        <text x={cx} y={cy + 8} textAnchor="middle" fill="#94a3b8" fontSize="8">{name}</text>
+        <text x={cx} y={cy - 5} textAnchor="middle" fill={theme === 'light' ? '#1E211D' : 'white'} fontSize="11" fontWeight="bold">{label}</text>
+        <text x={cx} y={cy + 8} textAnchor="middle" fill={theme === 'light' ? '#6B6F66' : '#94a3b8'} fontSize="8">{name}</text>
       </svg>
     </div>
   )
 }
 
 function GaugeArc({ fat, meta }: { fat: number; meta: number }) {
+  const { theme } = useTheme()
   const achievement = Math.max(0, (fat / meta) * 100)
   const fillColor = achievement < 40 ? '#ef4444' : achievement < 70 ? '#eab308' : achievement < 85 ? '#4ade80' : '#16a34a'
   const cx = 72, cy = 66, r = 56
@@ -96,17 +99,18 @@ function GaugeArc({ fat, meta }: { fat: number; meta: number }) {
   return (
     <div className="shrink-0">
       <svg viewBox="0 0 144 78" width="120" height="65" style={{ display: 'block' }}>
-        <path d={`M ${leftX} ${cy} A ${r} ${r} 0 0 1 ${rightX} ${cy}`} fill="none" stroke="#0f172a" strokeWidth="12" strokeLinecap="round" />
+        <path d={`M ${leftX} ${cy} A ${r} ${r} 0 0 1 ${rightX} ${cy}`} fill="none" stroke={theme === 'light' ? '#DEDED4' : '#0f172a'} strokeWidth="12" strokeLinecap="round" />
         {arcSpan > 0.5 && (
           <path d={`M ${leftX} ${cy} A ${r} ${r} 0 ${largeArc} 1 ${endX} ${endY}`} fill="none" stroke={fillColor} strokeWidth="12" strokeLinecap="round" />
         )}
-        <text x={cx} y={cy - 4} textAnchor="middle" fill="white" fontSize="17" fontWeight="bold">{`${achievement.toFixed(2)}%`}</text>
+        <text x={cx} y={cy - 4} textAnchor="middle" fill={theme === 'light' ? '#1E211D' : 'white'} fontSize="17" fontWeight="bold">{`${achievement.toFixed(2)}%`}</text>
       </svg>
     </div>
   )
 }
 
 function MetaGauge({ fat, meta }: { fat: number; meta: number }) {
+  const { theme } = useTheme()
   const achievement = Math.max(0, (fat / meta) * 100)  // 0% a N%
   const difPct      = ((fat / meta) - 1) * 100
 
@@ -142,18 +146,18 @@ function MetaGauge({ fat, meta }: { fat: number; meta: number }) {
       {/* R$ acima do gauge */}
       <div className="flex w-full justify-between px-0.5 mb-1">
         <div>
-          <p className="text-xs font-bold text-white leading-none">{fmt(fat)}</p>
+          <p className="text-xs font-bold text-foreground leading-none">{fmt(fat)}</p>
           <p className="text-[9px] text-slate-400 mt-0.5">Realizado</p>
         </div>
         <div className="text-right">
-          <p className="text-xs font-bold text-white leading-none">{fmt(meta)}</p>
+          <p className="text-xs font-bold text-foreground leading-none">{fmt(meta)}</p>
           <p className="text-[9px] text-slate-400 mt-0.5">Meta</p>
         </div>
       </div>
       <p className="text-[9px] font-medium text-slate-400 mb-0.5">% Atingimento</p>
       <svg viewBox="0 0 144 80" width="144" height="80" style={{ display: 'block' }}>
         <path d={`M ${leftX} ${cy} A ${r} ${r} 0 0 1 ${rightX} ${cy}`}
-          fill="none" stroke="#0f172a" strokeWidth="12" strokeLinecap="round" />
+          fill="none" stroke={theme === 'light' ? '#DEDED4' : '#0f172a'} strokeWidth="12" strokeLinecap="round" />
         {arcSpan > 0.5 && (
           <path d={`M ${leftX} ${cy} A ${r} ${r} 0 ${largeArc} 1 ${endX} ${endY}`}
             fill="none" stroke={fillColor} strokeWidth="12" strokeLinecap="round" />
@@ -162,10 +166,10 @@ function MetaGauge({ fat, meta }: { fat: number; meta: number }) {
           <line x1={tickIX} y1={tickIY} x2={tickOX} y2={tickOY}
             stroke="white" strokeWidth="2" strokeLinecap="round" />
         )}
-        <text x={leftX}  y={cy + 13} textAnchor="middle" fill="#475569" fontSize="9">0%</text>
-        <text x={cx}     y={cy - r - 7} textAnchor="middle" fill="#475569" fontSize="9">50%</text>
-        <text x={rightX} y={cy + 13} textAnchor="middle" fill="#475569" fontSize="9">100%</text>
-        <text x={cx} y={cy - 6} textAnchor="middle" fill="white" fontSize="17" fontWeight="bold">{label}</text>
+        <text x={leftX}  y={cy + 13} textAnchor="middle" fill={theme === 'light' ? '#6B6F66' : '#475569'} fontSize="9">0%</text>
+        <text x={cx}     y={cy - r - 7} textAnchor="middle" fill={theme === 'light' ? '#6B6F66' : '#475569'} fontSize="9">50%</text>
+        <text x={rightX} y={cy + 13} textAnchor="middle" fill={theme === 'light' ? '#6B6F66' : '#475569'} fontSize="9">100%</text>
+        <text x={cx} y={cy - 6} textAnchor="middle" fill={theme === 'light' ? '#1E211D' : 'white'} fontSize="17" fontWeight="bold">{label}</text>
       </svg>
     </div>
   )
@@ -216,22 +220,22 @@ function ProdutoRow({ codParc, p, filtros }: { codParc: number; p: any; filtros:
         <td className="px-2 py-1.5" />
       </tr>
       {expanded && loadingMensal && (
-        <tr className="bg-slate-950/60 border-l-2 border-l-slate-700">
+        <tr className="bg-slate-900/60 border-l-2 border-l-slate-700">
           <td colSpan={6} className="pl-12 pr-2 py-1.5 text-slate-500 text-[11px]">Carregando detalhamento mensal...</td>
         </tr>
       )}
       {expanded && mensalError && (
-        <tr className="bg-slate-950/60 border-l-2 border-l-red-700">
+        <tr className="bg-slate-900/60 border-l-2 border-l-red-700">
           <td colSpan={6} className="pl-12 pr-2 py-1.5 text-red-400 text-[11px]">Não foi possível carregar o detalhamento mensal.</td>
         </tr>
       )}
       {expanded && !loadingMensal && !mensalError && (mensal ?? []).length === 0 && (
-        <tr className="bg-slate-950/60 border-l-2 border-l-slate-700">
+        <tr className="bg-slate-900/60 border-l-2 border-l-slate-700">
           <td colSpan={6} className="pl-12 pr-2 py-1.5 text-slate-500 text-[11px]">Nenhum registro mensal encontrado.</td>
         </tr>
       )}
       {expanded && !loadingMensal && !mensalError && (mensal ?? []).map((m: any) => (
-        <tr key={m.mes} className="bg-slate-950/60 border-l-2 border-l-slate-700">
+        <tr key={m.mes} className="bg-slate-900/60 border-l-2 border-l-slate-700">
           <td className="pl-12 pr-2 py-1 text-slate-400 text-[11px]">{formatMes(m.mes)}</td>
           <td className="px-2 py-1" />
           <td className="px-2 py-1 text-green-500/70 text-[11px] text-right">{formatCurrency(Number(m.valor))}</td>
@@ -273,7 +277,7 @@ function ClienteRow({ c, filtros }: { c: any; filtros: Filtros }) {
         className="hover:bg-slate-700/30 transition-colors cursor-pointer"
         onClick={() => setExpanded(e => !e)}
       >
-        <td className="px-2 py-2 text-white font-medium">
+        <td className="px-2 py-2 text-foreground font-medium">
           <span className="flex items-center gap-1">
             {expanded ? <ChevronDown className="w-3 h-3 shrink-0 text-slate-400" /> : <ChevronRight className="w-3 h-3 shrink-0 text-slate-400" />}
             <span className="truncate">{c.razaoSocial ?? `Cliente ${c.codParc}`}</span>
@@ -311,6 +315,7 @@ function ClienteRow({ c, filtros }: { c: any; filtros: Filtros }) {
 const DEFAULT_FILTROS: Filtros = { dataInicio: '2026-01-01', dataFim: '2026-12-31' }
 
 export default function Vendedores() {
+  const { theme } = useTheme()
   const [filtros, setFiltros] = useState<Filtros>(DEFAULT_FILTROS)
   const [selected, setSelected] = useState<string | null>(null)
   const [tipoAtivo, setTipoAtivo] = useState<string | null>(null)
@@ -382,7 +387,7 @@ export default function Vendedores() {
   // "nomeVendedor" canônico — não pode vir de `lista`, que já está filtrada pela tela.
   const { data: disponiveis } = useQuery({
     queryKey: ['dashboard-original-filtros-disponiveis'],
-    queryFn: getDashboardOriginalFiltrosDisponiveis,
+    queryFn: () => getDashboardOriginalFiltrosDisponiveis(),
     staleTime: 5 * 60_000,
   })
 
@@ -554,7 +559,7 @@ export default function Vendedores() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-white">Análise por Vendedor</h1>
+        <h1 className="text-2xl font-bold text-foreground">Análise por Vendedor</h1>
         <p className="text-slate-400 text-sm mt-0.5">Performance individual, carteira de clientes e evolução</p>
       </div>
 
@@ -585,7 +590,7 @@ export default function Vendedores() {
                   className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all border ${
                     isActive
                       ? 'bg-green-500/20 text-green-300 border-green-500/50'
-                      : 'bg-slate-700/60 text-slate-300 border-slate-600 hover:border-slate-400 hover:text-white'
+                      : 'bg-slate-700/60 text-slate-300 border-slate-600 hover:border-slate-400 hover:text-foreground'
                   }`}
                 >
                   {p.projeto}
@@ -594,7 +599,7 @@ export default function Vendedores() {
             })}
           </div>
           {projetosAtivos.length > 0 && (
-            <button onClick={() => setProjetosAtivos([])} className="shrink-0 text-[11px] text-slate-400 hover:text-white transition-colors">
+            <button onClick={() => setProjetosAtivos([])} className="shrink-0 text-[11px] text-slate-400 hover:text-foreground transition-colors">
               Limpar ×
             </button>
           )}
@@ -609,7 +614,7 @@ export default function Vendedores() {
             {badges.map((b, i) => (
               <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-700 text-[11px] text-slate-200">
                 {b.label}
-                <button onClick={b.onRemove} className="text-slate-400 hover:text-white ml-0.5 leading-none">×</button>
+                <button onClick={b.onRemove} className="text-slate-400 hover:text-foreground ml-0.5 leading-none">×</button>
               </span>
             ))}
           </div>
@@ -639,7 +644,7 @@ export default function Vendedores() {
                     <DollarSign className="w-3 h-3 text-green-400" />
                   </div>
                 </div>
-                <p className="text-lg font-bold text-white leading-none mb-1">{formatCurrency(fatAtual)}</p>
+                <p className="text-lg font-bold text-foreground leading-none mb-1">{formatCurrency(fatAtual)}</p>
                 <div className="mt-auto -mx-1">
                   <MiniSparkline data={sparklines.TOTAL} color="#22c55e" />
                 </div>
@@ -661,7 +666,7 @@ export default function Vendedores() {
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">
                   {label}{isActive && <span className={`ml-1.5 ${TAILWIND[key as keyof typeof TAILWIND].text}`}>●</span>}
                 </p>
-                <p className="text-lg font-bold text-white leading-none mb-1">{formatCurrency(Number(kpi?.faturamento ?? 0))}</p>
+                <p className="text-lg font-bold text-foreground leading-none mb-1">{formatCurrency(Number(kpi?.faturamento ?? 0))}</p>
                 <div className="mt-auto -mx-1">
                   <MiniSparkline data={sparklines[key] ?? []} color={color} />
                 </div>
@@ -675,7 +680,7 @@ export default function Vendedores() {
               <Target className="w-3 h-3 text-orange-400" />
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Meta 2026</p>
             </div>
-            <p className="text-lg font-bold text-white leading-none mb-1">{formatCurrency(totalMeta)}</p>
+            <p className="text-lg font-bold text-foreground leading-none mb-1">{formatCurrency(totalMeta)}</p>
             {totalMeta > 0 && totalFat > 0 && (
               <div className="space-y-1.5 mt-auto">
                 <span className={`text-[11px] font-semibold ${totalFat >= totalMeta ? 'text-green-400' : 'text-orange-400'}`}>
@@ -700,7 +705,7 @@ export default function Vendedores() {
         {/* Evolução Consolidada */}
         <div className="bg-slate-800 border border-slate-700 rounded-xl p-5">
           <div className="flex items-center justify-between mb-1">
-            <h2 className="text-sm font-semibold text-white">{tituloEvolucao}</h2>
+            <h2 className="text-sm font-semibold text-foreground">{tituloEvolucao}</h2>
             {!selected && <span className="text-[11px] text-slate-500">Clique em um vendedor para filtrar</span>}
           </div>
           {(() => {
@@ -715,14 +720,14 @@ export default function Vendedores() {
             return (
               <ResponsiveContainer width="100%" height={230}>
                 <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#0f1d30" vertical={false} />
-                  <XAxis dataKey="mes" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} width={58} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#DEDED4' : '#0f1d30'} vertical={false} />
+                  <XAxis dataKey="mes" tick={{ fill: theme === 'light' ? '#6B6F66' : '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} tick={{ fill: theme === 'light' ? '#6B6F66' : '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} width={58} />
                   <Tooltip
-                    contentStyle={{ background: '#0f1d30', border: '1px solid #1e3454', borderRadius: 8, fontSize: 12 }}
+                    contentStyle={{ background: 'var(--color-chart-tooltip-bg)', border: '1px solid var(--color-chart-tooltip-border)', borderRadius: 8, fontSize: 12 }}
                     formatter={(v: number, name: string) => [formatCurrency(v), name]}
-                    labelStyle={{ color: '#f8fafc', marginBottom: 4 }}
-                    itemStyle={{ color: '#fff' }}
+                    labelStyle={{ color: 'var(--color-chart-tooltip-text)', marginBottom: 4 }}
+                    itemStyle={{ color: 'var(--color-chart-tooltip-text)' }}
                   />
                   <Line type="monotone" dataKey="Faturamento" stroke="#16a34a" strokeWidth={2} dot={{ fill: '#16a34a', r: 3, strokeWidth: 0 }} activeDot={{ r: 5, fill: '#22c55e' }} />
                   {showMeta && <Line type="monotone" dataKey="Meta" stroke="#f97316" strokeWidth={1.5} strokeDasharray="5 4" dot={false} activeDot={{ r: 4, fill: '#f97316' }} connectNulls />}
@@ -743,7 +748,7 @@ export default function Vendedores() {
 
           {/* Título */}
           <div className="px-5 py-3 border-b border-slate-700">
-            <p className="text-sm font-semibold text-white">Resultado Vendedores</p>
+            <p className="text-sm font-semibold text-foreground">Resultado Vendedores</p>
           </div>
 
           {/* Cabeçalho das colunas */}
@@ -785,10 +790,10 @@ export default function Vendedores() {
                     className={`w-full text-left px-5 py-3 hover:bg-slate-700/30 transition-colors group flex items-center gap-3 ${isSelected ? 'bg-green-900/20 border-l-4 border-l-green-500' : ''}`}
                   >
                     {/* Nome */}
-                    <p className="flex-1 min-w-0 text-sm font-semibold text-white truncate">{v.nomeVendedor ?? 'Sem vendedor'}</p>
+                    <p className="flex-1 min-w-0 text-sm font-semibold text-foreground truncate">{v.nomeVendedor ?? 'Sem vendedor'}</p>
 
                     {/* Faturamento */}
-                    <p className="w-[88px] text-right shrink-0 text-sm font-bold text-white">{fmtM2(fat)}</p>
+                    <p className="w-[88px] text-right shrink-0 text-sm font-bold text-foreground">{fmtM2(fat)}</p>
                     <p className="w-[88px] text-right shrink-0 text-sm text-slate-300">{meta != null ? fmtM2(meta) : '—'}</p>
                     <p className={`w-[72px] text-right shrink-0 text-sm font-bold ${pctColor}`}>
                       {pctAting != null ? `${pctAting.toFixed(1)}%` : '—'}
@@ -798,8 +803,8 @@ export default function Vendedores() {
                     <div className="w-px h-6 bg-slate-700 shrink-0" />
 
                     {/* CRM */}
-                    <p className="w-[52px] text-center shrink-0 text-sm text-white">{crm != null ? crm.emAndamento : '—'}</p>
-                    <p className="w-[90px] text-center shrink-0 text-sm text-white">{crm != null ? fmtM2(Number(crm.valorAndamento)) : '—'}</p>
+                    <p className="w-[52px] text-center shrink-0 text-sm text-foreground">{crm != null ? crm.emAndamento : '—'}</p>
+                    <p className="w-[90px] text-center shrink-0 text-sm text-foreground">{crm != null ? fmtM2(Number(crm.valorAndamento)) : '—'}</p>
 
                     <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-300 transition-colors shrink-0" />
                   </button>
@@ -812,7 +817,7 @@ export default function Vendedores() {
         {/* Top Clientes */}
         <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-700">
-            <p className="text-sm font-semibold text-white">{tituloClientes}</p>
+            <p className="text-sm font-semibold text-foreground">{tituloClientes}</p>
           </div>
           <div className="overflow-y-auto max-h-[480px]">
             <table className="w-full table-fixed text-xs">

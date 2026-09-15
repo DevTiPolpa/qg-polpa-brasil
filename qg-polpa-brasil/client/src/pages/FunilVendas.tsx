@@ -18,14 +18,13 @@ import {
   type FunilEtapa,
 } from '../lib/api'
 import { formatCurrency, formatNumber, formatPercent, formatMes } from '../lib/utils'
+import { useTheme } from '../hooks/useTheme'
 
 // ─── Cores ────────────────────────────────────────────────────────────────────
 // Mesmos tons de azul/verde usados no gráfico de Evolução Mensal da tela Histórico Clientes.
 const C_ANDAMENTO = '#4F7CAC'
 const C_GANHO     = '#4F9D6E'
 const C_PERDIDO   = 'oklch(0.58 0.13 25)'
-const C_GRID      = 'oklch(0.22 0.008 265)'
-const C_TICK      = 'oklch(0.52 0.012 265)'
 
 // ─── Ordem das etapas por pipeline ───────────────────────────────────────────
 // Palavras-chave únicas de cada etapa para match case-insensitive
@@ -113,6 +112,10 @@ function KpiCard({ label, value, sub, icon: Icon, iconClass, loading }: KpiProps
 
 // ─── Página ───────────────────────────────────────────────────────────────────
 export default function FunilVendas() {
+  const { theme } = useTheme()
+  const C_GRID   = theme === 'light' ? '#DEDED4' : 'oklch(0.22 0.008 265)'
+  const C_TICK   = theme === 'light' ? '#6B6F66' : 'oklch(0.52 0.012 265)'
+
   const [selectedIds, setSelectedIds] = useState<number[] | undefined>(undefined)
   const [userId, setUserId]           = useState<number | undefined>(undefined)
 
@@ -199,7 +202,7 @@ export default function FunilVendas() {
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 allActive
                   ? 'bg-green-600/20 text-green-400 ring-1 ring-green-500/40'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                  : 'text-slate-400 hover:text-foreground hover:bg-slate-700'
               }`}
             >
               Todos
@@ -212,8 +215,8 @@ export default function FunilVendas() {
                   isActive(p.id) && !allActive
                     ? 'bg-green-600/20 text-green-400 ring-1 ring-green-500/40'
                     : allActive
-                      ? 'text-slate-400 hover:text-white hover:bg-slate-700'
-                      : 'text-slate-500 hover:text-white hover:bg-slate-700'
+                      ? 'text-slate-400 hover:text-foreground hover:bg-slate-700'
+                      : 'text-slate-500 hover:text-foreground hover:bg-slate-700'
                 }`}
               >
                 {p.label}
@@ -257,9 +260,9 @@ export default function FunilVendas() {
                     <XAxis type="number" tick={{ fontSize: 11, fill: C_TICK }} axisLine={false} tickLine={false} />
                     <YAxis
                       type="category" dataKey="etapa" width={180}
-                      tick={{ fontSize: 10, fill: '#ffffff' }} axisLine={false} tickLine={false}
+                      tick={{ fontSize: 10, fill: theme === 'light' ? '#1E211D' : '#ffffff' }} axisLine={false} tickLine={false}
                     />
-                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'oklch(0.22 0.008 265 / 0.4)' }} />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: theme === 'light' ? 'oklch(0 0 0 / 0.06)' : 'oklch(0.22 0.008 265 / 0.4)' }} />
                     <Bar dataKey="Negócios" fill={C_ANDAMENTO} radius={[0, 3, 3, 0]} maxBarSize={20} />
                   </BarChart>
                 </ResponsiveContainer>

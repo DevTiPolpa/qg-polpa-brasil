@@ -11,6 +11,7 @@ import MultiSelect from '../components/MultiSelect'
 import { Button } from '../components/ui/button'
 import { formatCurrency, formatCurrencyExato, formatCurrencyAbrev, formatKg, formatPercent, tipoReceitaLabel } from '../lib/utils'
 import { COLORS, BORDER_L_COLOR } from '../lib/colors'
+import { useTheme } from '../hooks/useTheme'
 import { TrendingUp, TrendingDown, Target, DollarSign, Package, PackageCheck, AlertTriangle, Info, SlidersHorizontal, X, BarChart2, Calendar } from 'lucide-react'
 import { Card, CardContent } from '../components/ui/card'
 
@@ -41,12 +42,12 @@ function GraficoTooltip({ active, payload, label, metric = 'faturamento' }: any)
     .filter((p: any) => p.dataKey !== undefined && p.name !== 'Orçamento')
     .reduce((acc: number, p: any) => acc + (p.value ?? 0), 0)
   return (
-    <div style={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12, padding: '8px 12px' }}>
-      <p style={{ color: '#e2e8f0', fontWeight: 600, marginBottom: 4 }}>{label}</p>
+    <div style={{ backgroundColor: 'var(--color-chart-tooltip-bg)', border: '1px solid var(--color-chart-tooltip-border)', borderRadius: 8, fontSize: 12, padding: '8px 12px' }}>
+      <p style={{ color: 'var(--color-chart-tooltip-text)', fontWeight: 600, marginBottom: 4 }}>{label}</p>
       {payload.map((p: any) => (
         <p key={p.dataKey} style={{ color: p.color, margin: '2px 0' }}>{p.name} : {fmt(p.value)}</p>
       ))}
-      <p style={{ color: '#e2e8f0', fontWeight: 700, margin: '4px 0 0', paddingTop: 4, borderTop: '1px solid #334155' }}>
+      <p style={{ color: 'var(--color-chart-tooltip-text)', fontWeight: 700, margin: '4px 0 0', paddingTop: 4, borderTop: '1px solid var(--color-chart-tooltip-border)' }}>
         Previsão Total {metric === 'volume' ? 'KG' : 'R$'} : {fmt(previsaoTotal)}
       </p>
     </div>
@@ -64,7 +65,7 @@ function KpiCard({ label, value, tooltip, icon: Icon, colorClass }: {
           <Icon className="w-3.5 h-3.5 text-slate-300" />
         </div>
       </div>
-      <p className="text-lg font-bold text-white leading-none truncate">{value}</p>
+      <p className="text-lg font-bold text-foreground leading-none truncate">{value}</p>
     </div>
   )
 }
@@ -73,7 +74,7 @@ function LinhaTabela({ linha, isTotal, selected, onClick }: {
   linha: VisaoGlobalLinhaMercado; isTotal?: boolean; selected?: boolean; onClick?: () => void
 }) {
   const trClass = isTotal
-    ? 'bg-slate-700/60 font-bold text-white border-t-2 border-slate-600'
+    ? 'bg-slate-700/60 font-bold text-foreground border-t-2 border-slate-600'
     : selected
       ? 'bg-primary/15 border-b border-slate-700/30 cursor-pointer'
       : 'hover:bg-slate-700/30 border-b border-slate-700/30 cursor-pointer'
@@ -280,6 +281,12 @@ export default function VisaoGlobal() {
   const mercadosSemInfo = data?.diagnostico.mercadosSemInformacao ?? []
 
   const [chartView, setChartView] = useState<'faturamento' | 'volume'>('faturamento')
+  // Cores de eixo/grade do gráfico não podem ler variável CSS (viram atributo
+  // SVG, não estilo) — branch manual pelo tema, mesmos valores de index.css.
+  const { theme } = useTheme()
+  const chartAxisColor = theme === 'light' ? '#6B6F66' : '#94a3b8'
+  const chartGridColor = theme === 'light' ? '#DEDED4' : '#334155'
+  const chartLabelColor = theme === 'light' ? '#1E211D' : '#e2e8f0'
 
   const dadosGrafico = (data?.mensal ?? []).map(m => {
     const vendaFirme = m.vendaFirmeRS ?? 0
@@ -483,11 +490,11 @@ export default function VisaoGlobal() {
       <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
         <div className="px-5 py-3 border-b border-slate-700 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-semibold text-white">Mercado de Vendas</p>
+            <p className="text-sm font-semibold text-foreground">Mercado de Vendas</p>
             {mercadosSel.map(m => (
               <span key={m} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/15 text-primary text-[11px] font-medium">
                 {m}
-                <button onClick={() => toggleMercado(m)} className="hover:text-white transition-colors" title="Remover mercado do filtro">
+                <button onClick={() => toggleMercado(m)} className="hover:text-foreground transition-colors" title="Remover mercado do filtro">
                   <X className="w-2.5 h-2.5" />
                 </button>
               </span>
@@ -536,7 +543,7 @@ export default function VisaoGlobal() {
       {/* Gráfico mensal */}
       <div className="bg-slate-800 border border-slate-700 rounded-xl px-5 py-4">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-          <p className="text-sm font-semibold text-white">
+          <p className="text-sm font-semibold text-foreground">
             Resultado de Vendas
             <span className="text-[10px] text-muted-foreground font-normal ml-2">
               · rótulo: Previsão Total {chartView === 'volume' ? 'KG' : 'R$'}
@@ -565,9 +572,9 @@ export default function VisaoGlobal() {
         </div>
         <ResponsiveContainer width="100%" height={320}>
           <ComposedChart data={dadosGrafico} margin={{ left: 4, right: 8, top: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-            <XAxis dataKey="mes" stroke="#94a3b8" fontSize={11} />
-            <YAxis stroke="#94a3b8" fontSize={11} width={72} tickFormatter={chartConfig.tickFormatter} />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} vertical={false} />
+            <XAxis dataKey="mes" stroke={chartAxisColor} fontSize={11} />
+            <YAxis stroke={chartAxisColor} fontSize={11} width={72} tickFormatter={chartConfig.tickFormatter} />
             <Tooltip content={<GraficoTooltip metric={chartView} />} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             {realizadoDisponivel && (
@@ -601,7 +608,7 @@ export default function VisaoGlobal() {
                 <LabelList
                   dataKey={chartConfig.totalKey}
                   position="top"
-                  style={{ fontSize: 10, fill: '#e2e8f0', fontWeight: 500 }}
+                  style={{ fontSize: 10, fill: chartLabelColor, fontWeight: 500 }}
                   formatter={chartConfig.totalLabelFormatter}
                 />
               </Bar>

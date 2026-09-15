@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import FiltrosGlobais, { Filtros } from "@/components/FiltrosGlobais";
 import { formatCurrency, formatKg, formatNumber, formatMes, tipoReceitaLabel } from "@/lib/utils";
 import { COLORS, BORDER_L_COLOR, colorByTipo } from "@/lib/colors";
+import { useTheme } from "@/hooks/useTheme";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, PieChart, Pie, Cell, LabelList,
@@ -49,12 +50,15 @@ const KPI_CONFIG = [
 ];
 
 function YoYBadge({ atual, anterior }: { atual: number; anterior?: number | null }) {
+  const { theme } = useTheme();
   if (anterior == null || anterior === 0) return null;
   const pct = ((atual - anterior) / Math.abs(anterior)) * 100;
   const positivo = pct >= 0;
-  const cor = positivo
-    ? "text-[oklch(0.65_0.20_145)] bg-[oklch(0.65_0.20_145_/_0.12)]"
-    : "text-[oklch(0.65_0.22_25)] bg-[oklch(0.65_0.22_25_/_0.12)]";
+  // Tons mais escuros no tema claro — os oklch originais (usados no botão
+  // primário) não têm contraste suficiente como texto pequeno sobre fundo claro.
+  const cor = theme === "light"
+    ? (positivo ? "text-[#166534] bg-[#16653422]" : "text-[#991b1b] bg-[#991b1b22]")
+    : (positivo ? "text-[oklch(0.65_0.20_145)] bg-[oklch(0.65_0.20_145_/_0.12)]" : "text-[oklch(0.65_0.22_25)] bg-[oklch(0.65_0.22_25_/_0.12)]");
   return (
     <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${cor}`}>
       {positivo ? "↑" : "↓"} {Math.abs(pct).toFixed(1)}%
@@ -100,7 +104,7 @@ const CustomTooltip = ({ active, payload, label, metric = "faturamento" }: any) 
   const fmt = metric === "volume" ? formatKg : formatCurrency;
   return (
     <div className="bg-card border border-border rounded-xl px-4 py-3 shadow-2xl text-sm min-w-[230px]">
-      <p className="text-white font-semibold mb-3 text-xs uppercase tracking-wide">{label}</p>
+      <p className="text-foreground font-semibold mb-3 text-xs uppercase tracking-wide">{label}</p>
       <div className="space-y-2">
         {sorted.map((p: any) => (
           <div key={p.name} className="flex items-center justify-between gap-4">
@@ -108,13 +112,13 @@ const CustomTooltip = ({ active, payload, label, metric = "faturamento" }: any) 
               <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: p.color }} />
               <span className="text-slate-300 text-xs">{p.name}</span>
             </div>
-            <span className="font-semibold text-white text-xs tabular-nums">{fmt(p.value)}</span>
+            <span className="font-semibold text-foreground text-xs tabular-nums">{fmt(p.value)}</span>
           </div>
         ))}
       </div>
       <div className="border-t border-border mt-3 pt-2 flex items-center justify-between">
         <span className="text-slate-300 text-xs font-medium">Total Atual</span>
-        <span className="font-bold text-white text-sm tabular-nums">{fmt(total)}</span>
+        <span className="font-bold text-foreground text-sm tabular-nums">{fmt(total)}</span>
       </div>
       {orcEntry != null && orcEntry.value != null && (
         <div className="border-t border-dashed border-border/60 mt-2 pt-2 flex items-center justify-between">
@@ -774,6 +778,7 @@ function RegioesTopBlock({ data, filtroLabel, filtrosCombinados, metric = "fatur
 
 // ─── Dashboard Principal ─────────────────────────────────────────────────────────────────────────────────
 export default function Dashboard() {
+  const { theme } = useTheme();
   const [filtros, setFiltros] = useState<Filtros>({ dataInicio: "2026-01-01", dataFim: "2026-12-31" });
   const [drillDownTipo, setDrillDownTipo] = useState<string | null>(null);
   const [tipoReceitaFiltro, setTipoReceitaFiltro] = useState<string | null>(null);
@@ -850,6 +855,13 @@ export default function Dashboard() {
       volOrc: orcMap.get(e.mes ?? "")?.volOrc ?? null,
     };
   });
+
+  // Cores de eixo/grade do gráfico não podem ler variável CSS (viram atributo
+  // SVG, não estilo) — branch manual pelo tema, mesmos valores de index.css.
+  const chartAxisColor = theme === "light" ? "#6B6F66" : "oklch(0.52 0.012 265)";
+  const chartGridColor = theme === "light" ? "#DEDED4" : "oklch(0.22 0.008 265)";
+  const chartReferenceColor = theme === "light" ? "#8A8D82" : "oklch(0.75 0.012 265)";
+  const chartCursorColor = theme === "light" ? "oklch(0 0 0 / 0.06)" : "oklch(0.22 0.008 265 / 0.5)";
 
   const evolucaoConfig = useMemo(() => (
     evolucaoView === "faturamento"
@@ -964,7 +976,7 @@ export default function Dashboard() {
               {badges.map((b, i) => (
                 <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-700 text-[11px] text-slate-200">
                   {b.label}
-                  <button onClick={b.onRemove} className="text-slate-400 hover:text-white ml-0.5 leading-none">×</button>
+                  <button onClick={b.onRemove} className="text-slate-400 hover:text-foreground ml-0.5 leading-none">×</button>
                 </span>
               ))}
             </div>
@@ -1013,15 +1025,15 @@ export default function Dashboard() {
           >
             <CardContent className="p-4">
               <div className="flex items-center justify-between gap-2 mb-3">
-                <p className="text-[10px] font-semibold text-[oklch(0.72_0.22_25)] uppercase tracking-widest leading-tight">Devoluções</p>
+                <p className="text-[10px] font-semibold text-destructive uppercase tracking-widest leading-tight">Devoluções</p>
                 <div className="w-8 h-8 rounded-lg icon-red flex items-center justify-center shrink-0">
                   <RotateCcw className="w-3.5 h-3.5" />
                 </div>
               </div>
-              <p className="text-sm font-bold text-[oklch(0.72_0.22_25)] tracking-tight leading-none break-all">
+              <p className="text-sm font-bold text-destructive tracking-tight leading-none break-all">
                 − {formatCurrency(kpis?.faturamentoDevolucao ?? 0)}
               </p>
-              <p className="text-[10px] text-[oklch(0.65_0.22_25)] mt-1.5">
+              <p className="text-[10px] text-destructive mt-1.5">
                 − {formatKg(kpis?.volumeDevolucao ?? 0)}
               </p>
             </CardContent>
@@ -1044,14 +1056,20 @@ export default function Dashboard() {
               : pct >= 40
               ? "oklch(0.75 0.18 80)"
               : "oklch(0.65 0.22 25)";
+            // Texto sobre o mesmo tom precisa de mais contraste no tema claro
+            // que o preenchimento da barra (que só precisa se distinguir da trilha).
+            const barTextColor = theme === "light"
+              ? (pct >= 70 ? "#166534" : pct >= 40 ? "#92400e" : "#991b1b")
+              : barColor;
+            const orcamentoTextColor = theme === "light" ? "#8a5a1f" : COLOR_ORCAMENTO;
             return (
               <Card className="lg:col-span-2 border border-[oklch(0.55_0.18_55_/_0.35)] bg-[oklch(0.55_0.18_55_/_0.06)] !py-0 !gap-0">
                 <CardContent className="px-4 py-3">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ background: `${COLOR_ORCAMENTO}22` }}>
-                      <TrendingUp className="w-3 h-3" style={{ color: COLOR_ORCAMENTO }} />
+                      <TrendingUp className="w-3 h-3" style={{ color: orcamentoTextColor }} />
                     </div>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: COLOR_ORCAMENTO }}>Orçamento 2026</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: orcamentoTextColor }}>Orçamento 2026</p>
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 items-baseline">
                     <div>
@@ -1067,7 +1085,7 @@ export default function Dashboard() {
                   {/* Termômetro de progresso */}
                   <div className="mt-3 space-y-1.5">
                     <div className="flex items-center justify-between text-[10px]">
-                      <span className="font-semibold" style={{ color: barColor }}>{pct.toFixed(1)}% do orçamento atingido</span>
+                      <span className="font-semibold" style={{ color: barTextColor }}>{pct.toFixed(1)}% do orçamento atingido</span>
                     </div>
                     <div className="h-2 rounded-full bg-muted/40 overflow-hidden">
                       <div
@@ -1083,7 +1101,7 @@ export default function Dashboard() {
 
                   <div className="flex items-center gap-1 mt-2">
                     <div className="w-4 border-t-2 border-dashed" style={{ borderColor: COLOR_ORCAMENTO }} />
-                    <span className="text-[9px]" style={{ color: COLOR_ORCAMENTO }}>Linha nos gráficos</span>
+                    <span className="text-[9px]" style={{ color: orcamentoTextColor }}>Linha nos gráficos</span>
                   </div>
                 </CardContent>
               </Card>
@@ -1192,18 +1210,18 @@ export default function Dashboard() {
             ) : (
               <ResponsiveContainer width="100%" height={260}>
                 <ComposedChart data={evolucaoFormatada} margin={{ top: 5, right: 10, left: 0, bottom: 5 }} onClick={handleBarClick} style={{ cursor: "pointer" }} barCategoryGap="25%">
-                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.22 0.008 265)" vertical={false} />
-                  <XAxis dataKey="mesLabel" tick={{ fontSize: 11, fill: "oklch(0.52 0.012 265)" }} axisLine={false} tickLine={false} />
-                  <YAxis yAxisId="main" tick={{ fontSize: 11, fill: "oklch(0.52 0.012 265)" }} axisLine={false} tickLine={false} tickFormatter={evolucaoConfig.yTickFormatter} />
-                  <Tooltip content={<CustomTooltip metric={evolucaoView} />} cursor={{ fill: "oklch(0.22 0.008 265 / 0.5)" }} />
-                  <Legend wrapperStyle={{ fontSize: 12, color: "oklch(0.52 0.012 265)" }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} vertical={false} />
+                  <XAxis dataKey="mesLabel" tick={{ fontSize: 11, fill: chartAxisColor }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="main" tick={{ fontSize: 11, fill: chartAxisColor }} axisLine={false} tickLine={false} tickFormatter={evolucaoConfig.yTickFormatter} />
+                  <Tooltip content={<CustomTooltip metric={evolucaoView} />} cursor={{ fill: chartCursorColor }} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: chartAxisColor }} />
                   <Bar yAxisId="main" dataKey={evolucaoConfig.novoProjetoKey} name="Novo Projeto" fill={COLOR_NOVO_PROJETO} stackId="fat" maxBarSize={48} />
                   <Bar yAxisId="main" dataKey={evolucaoConfig.forecastKey} name="Forecast" fill={COLOR_FORECAST} stackId="fat" maxBarSize={48} />
                   <Bar yAxisId="main" dataKey={evolucaoConfig.vendaFirmeKey} name="Venda Firme" fill={COLOR_VENDA_FIRME} stackId="fat" radius={[4, 4, 0, 0]} maxBarSize={48}>
                     <LabelList
                       dataKey={evolucaoConfig.totalKey}
                       position="top"
-                      style={{ fontSize: 10, fill: "oklch(0.75 0.012 265)", fontWeight: 500 }}
+                      style={{ fontSize: 10, fill: chartReferenceColor, fontWeight: 500 }}
                       formatter={evolucaoConfig.totalLabelFormatter}
                     />
                   </Bar>
@@ -1212,11 +1230,11 @@ export default function Dashboard() {
                       yAxisId="main"
                       dataKey={evolucaoConfig.antKey}
                       name="Ano Anterior"
-                      stroke="oklch(0.75 0.012 265)"
+                      stroke={chartReferenceColor}
                       strokeWidth={1.5}
                       strokeDasharray="5 4"
                       dot={false}
-                      activeDot={{ r: 4, fill: "oklch(0.75 0.012 265)" }}
+                      activeDot={{ r: 4, fill: chartReferenceColor }}
                       connectNulls
                     />
                   )}
@@ -1267,7 +1285,7 @@ export default function Dashboard() {
                         <Cell key={i} fill={item.color} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v: any) => formatCurrency(v)} contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 12, color: "#fff" }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#fff" }} />
+                    <Tooltip formatter={(v: any) => formatCurrency(v)} contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 12, color: "var(--color-foreground)" }} labelStyle={{ color: "var(--color-foreground)" }} itemStyle={{ color: "var(--color-foreground)" }} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="space-y-2.5 mt-3">
@@ -1279,10 +1297,10 @@ export default function Dashboard() {
                     >
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color }} />
-                        <span className="text-white">{item.name}</span>
+                        <span className="text-foreground">{item.name}</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <span className="font-semibold text-white">{formatCurrency(item.value)}</span>
+                        <span className="font-semibold text-foreground">{formatCurrency(item.value)}</span>
                         <ChevronRight className="w-3 h-3 text-muted-foreground/40" />
                       </div>
                     </div>

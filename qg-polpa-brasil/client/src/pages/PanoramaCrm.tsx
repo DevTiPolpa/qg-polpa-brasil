@@ -274,7 +274,7 @@ export default function PanoramaCrm() {
           <div className="flex items-center gap-1">
             {(['calendario', 'coorte'] as const).map(v => (
               <button key={v} onClick={() => setVisao(v)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${visao === v ? 'bg-green-600/20 text-green-400 ring-1 ring-green-500/40' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}>
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${visao === v ? 'bg-green-600/20 text-green-400 ring-1 ring-green-500/40' : 'text-slate-400 hover:text-foreground hover:bg-slate-700'}`}>
                 {v === 'calendario' ? 'Calendário' : 'Coorte'}
               </button>
             ))}
@@ -302,7 +302,7 @@ export default function PanoramaCrm() {
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pipeline:</span>
             {PIPELINES.map(p => (
               <button key={String(p.id)} onClick={() => setPipeline(p.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${pipeline === p.id ? 'bg-green-600/20 text-green-400 ring-1 ring-green-500/40' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}>
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${pipeline === p.id ? 'bg-green-600/20 text-green-400 ring-1 ring-green-500/40' : 'text-slate-400 hover:text-foreground hover:bg-slate-700'}`}>
                 {p.label}
               </button>
             ))}

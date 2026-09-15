@@ -74,7 +74,7 @@ function ValCell({ valor, prev, highlight }: { valor: number; prev: number | nul
 
   return (
     <td className={`px-2 py-2 text-right whitespace-nowrap ${bgColor}`}>
-      <div className={`text-xs font-semibold ${highlight ? 'text-white' : 'text-slate-300'}`}>
+      <div className={`text-xs font-semibold ${highlight ? 'text-foreground' : 'text-slate-300'}`}>
         {formatted ?? '—'}
       </div>
       {hasDiff && (
@@ -115,7 +115,7 @@ function ClienteRow({ row, dates, filtros, contagemTarefas, onTarefaCriada, cont
             {expanded
               ? <ChevronDown className="w-3.5 h-3.5 shrink-0 text-slate-400" />
               : <ChevronRight className="w-3.5 h-3.5 shrink-0 text-slate-400" />}
-            <span className="text-sm text-white font-medium truncate max-w-[220px]">
+            <span className="text-sm text-foreground font-medium truncate max-w-[220px]">
               {row.razaoSocial ?? `Cliente ${row.codParc}`}
             </span>
           </span>
@@ -284,7 +284,7 @@ export default function SnapshotComparativo() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <History className="w-6 h-6 text-violet-400" />
             Comparativo Semanal
           </h1>
@@ -299,7 +299,7 @@ export default function SnapshotComparativo() {
             <Camera className="w-4 h-4 text-violet-400 shrink-0" />
             <div>
               <p className="text-[10px] text-slate-400 uppercase tracking-wider">Snapshots disponíveis</p>
-              <p className="text-sm font-semibold text-white">{info!.length} {info!.length === 1 ? 'semana' : 'semanas'}</p>
+              <p className="text-sm font-semibold text-foreground">{info!.length} {info!.length === 1 ? 'semana' : 'semanas'}</p>
               <p className="text-[10px] text-slate-500">
                 {fmtDateFull(info![info!.length - 1].snapshotDate)} → {fmtDateFull(info![0].snapshotDate)}
               </p>
@@ -315,7 +315,7 @@ export default function SnapshotComparativo() {
         <div className="flex flex-col items-center justify-center py-20 gap-4 bg-slate-800/50 border border-slate-700 rounded-xl">
           <AlertCircle className="w-10 h-10 text-slate-500" />
           <div className="text-center">
-            <p className="text-white font-semibold">Nenhum snapshot disponível</p>
+            <p className="text-foreground font-semibold">Nenhum snapshot disponível</p>
             <p className="text-slate-400 text-sm mt-1">
               O sistema congela automaticamente toda quarta-feira às 14h30.
             </p>
@@ -327,12 +327,12 @@ export default function SnapshotComparativo() {
       {(hasDates || isLoading) && (
         <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-700 flex items-center gap-3 flex-wrap">
-            <p className="text-sm font-semibold text-white">Evolução por Cliente</p>
+            <p className="text-sm font-semibold text-foreground">Evolução por Cliente</p>
             <span className="text-xs text-slate-500">{rowsExibidas.length} de {rows.length} clientes</span>
 
             <button
               onClick={() => setOrdemDesc(v => !v)}
-              className="flex items-center gap-1.5 text-[11px] font-medium text-slate-300 hover:text-white bg-slate-700/60 hover:bg-slate-700 border border-slate-600 rounded-md px-2.5 py-1 transition-colors"
+              className="flex items-center gap-1.5 text-[11px] font-medium text-slate-300 hover:text-foreground bg-slate-700/60 hover:bg-slate-700 border border-slate-600 rounded-md px-2.5 py-1 transition-colors"
               title="Ordenar pelo valor Atual"
             >
               <ArrowUpDown className="w-3 h-3" />
@@ -344,7 +344,7 @@ export default function SnapshotComparativo() {
               className={`flex items-center gap-1.5 text-[11px] font-medium rounded-md px-2.5 py-1 border transition-colors ${
                 apenasComVariacao
                   ? 'bg-violet-500/20 text-violet-300 border-violet-500/50'
-                  : 'bg-slate-700/60 text-slate-300 border-slate-600 hover:bg-slate-700 hover:text-white'
+                  : 'bg-slate-700/60 text-slate-300 border-slate-600 hover:bg-slate-700 hover:text-foreground'
               }`}
               title="Mostrar apenas quem teve variação em relação à semana anterior"
             >
@@ -365,7 +365,7 @@ export default function SnapshotComparativo() {
                     className={`text-[11px] font-medium rounded px-2 py-1 transition-colors ${
                       janelaSemanas === op
                         ? 'bg-violet-500/30 text-violet-200'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-600/60'
+                        : 'text-slate-300 hover:text-foreground hover:bg-slate-600/60'
                     }`}
                     title={op === 'todas' ? 'Mostrar todo o histórico de snapshots' : `Mostrar apenas as últimas ${op} semanas`}
                   >

@@ -27,7 +27,7 @@ const Dialog = ({ open, onOpenChange, children }: DialogProps) => {
 
 const DialogContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement> & { onOpenChange?: (v: boolean) => void }>(
   ({ className, children, onOpenChange, ...props }, ref) => (
-    <div ref={ref} className={cn("relative z-50 w-full max-w-lg rounded-xl border bg-background p-6 shadow-2xl", className)} {...props}>
+    <div ref={ref} className={cn("relative z-50 w-full max-w-lg rounded-xl border border-border bg-background p-6 shadow-2xl", className)} {...props}>
       {children}
     </div>
   )

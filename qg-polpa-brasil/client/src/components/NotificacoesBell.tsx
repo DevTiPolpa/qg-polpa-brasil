@@ -65,7 +65,7 @@ export default function NotificacoesBell({ collapsed = false, dropdownAlign = 't
         type="button"
         onClick={() => setOpen(o => !o)}
         title="Notificações"
-        className={`relative flex items-center gap-2 w-full rounded-lg px-2 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition ${collapsed ? 'justify-center' : ''}`}
+        className={`relative flex items-center gap-2 w-full rounded-lg px-2 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-foreground transition ${collapsed ? 'justify-center' : ''}`}
       >
         <Bell size={16} className="shrink-0" />
         {!collapsed && <span>Notificações</span>}
@@ -109,7 +109,7 @@ export default function NotificacoesBell({ collapsed = false, dropdownAlign = 't
                     <Icon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${className}`} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <p className="text-xs font-semibold text-white truncate">{n.titulo}</p>
+                        <p className="text-xs font-semibold text-foreground truncate">{n.titulo}</p>
                         {!n.lida && <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />}
                       </div>
                       <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{n.mensagem}</p>
