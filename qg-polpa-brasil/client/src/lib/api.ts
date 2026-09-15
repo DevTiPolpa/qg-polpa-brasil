@@ -1879,3 +1879,113 @@ export async function createComentario(payload: ComentarioCreatePayload): Promis
     body: JSON.stringify(payload),
   })
 }
+
+// ============================================================
+// Visão Global Polpa Brasil — Orçado x Realizado por Mercado de Vendas.
+// Mercado e Projeto agora são filtros de seleção múltipla (drill-down
+// opcional, reversível) — a tela continua mostrando todos os mercados por
+// padrão quando nada está selecionado.
+// ============================================================
+
+export type VisaoGlobalFiltrosDisponiveis = {
+  produtos: { codProduto: number; nomeProduto: string }[]
+  grupos: string[]
+  anos: number[]
+  mercados: string[]
+  projetos: string[]
+}
+
+export type VisaoGlobalTipoReceita = 'VENDA_FIRME' | 'NOVO_PROJETO' | 'FORECAST'
+
+export type VisaoGlobalFiltros = {
+  ano?: number
+  meses?: number[]
+  codProdutos?: number[]
+  gruposProduto?: string[]
+  tipoReceita?: VisaoGlobalTipoReceita
+  mercados?: string[]
+  projetos?: string[]
+}
+
+export type VisaoGlobalLinhaMercado = {
+  mercado: string
+  orcamentoRS: number
+  orcamentoKG: number
+  orcamentoVolume: number
+  realizadoRS: number | null
+  realizadoKG: number | null
+  realizadoVolume: number | null
+  vendaFirmeRS: number | null
+  novoProjetoRS: number | null
+  forecastRS: number | null
+  previsaoTotalRS: number | null
+  previsaoTotalKG: number | null
+  pctOrcRealRS: number | null
+  pctOrcRealKG: number | null
+  pctOrcPrevisaoRS: number | null
+  pctOrcPrevisaoKG: number | null
+  pctVol: number | null
+  pctFat: number | null
+}
+
+export type VisaoGlobalMes = {
+  mes: number
+  orcamentoRS: number
+  vendaFirmeRS: number | null
+  novoProjetoRS: number | null
+  forecastRS: number | null
+  realizadoRS: number | null
+  orcamentoKG: number
+  vendaFirmeKG: number | null
+  novoProjetoKG: number | null
+  forecastKG: number | null
+  realizadoKG: number | null
+}
+
+export type VisaoGlobalDiagnostico = {
+  realizadoDisponivel: boolean
+  totalRegistrosOrcamento: number
+  totalRegistrosRealizado: number
+  colunaDataOrcamento: string
+  colunaDataRealizado: string
+  fonteOrcamento: string
+  fonteRealizado: string
+  vlrStDisponivel: boolean
+  mercadosSemInformacao: string[]
+}
+
+export type VisaoGlobalResumo = {
+  linhas: VisaoGlobalLinhaMercado[]
+  total: VisaoGlobalLinhaMercado
+  kpis: {
+    orcamentoTotalRS: number
+    realizadoTotalRS: number | null
+    desvioRS: number | null
+    atingimentoPct: number | null
+    orcamentoKG: number
+    realizadoKG: number | null
+    vendaFirmeTotalRS: number | null
+    novoProjetoTotalRS: number | null
+    forecastTotalRS: number | null
+    tipoReceitaSelecionado: VisaoGlobalTipoReceita | null
+  }
+  mensal: VisaoGlobalMes[]
+  diagnostico: VisaoGlobalDiagnostico
+}
+
+export async function getVisaoGlobalFiltrosDisponiveis(): Promise<VisaoGlobalFiltrosDisponiveis> {
+  return apiRequest<VisaoGlobalFiltrosDisponiveis>('/api/visao-global/filtros-disponiveis')
+}
+
+export async function getVisaoGlobalResumo(filtros: VisaoGlobalFiltros = {}): Promise<VisaoGlobalResumo> {
+  const params = new URLSearchParams()
+  if (filtros.ano != null) params.set('ano', String(filtros.ano))
+  appendArrayParam(params, 'meses', filtros.meses?.map(String))
+  appendArrayParam(params, 'codProdutos', filtros.codProdutos?.map(String))
+  appendArrayParam(params, 'gruposProduto', filtros.gruposProduto)
+  if (filtros.tipoReceita) params.set('tipoReceita', filtros.tipoReceita)
+  appendArrayParam(params, 'mercados', filtros.mercados)
+  appendArrayParam(params, 'projetos', filtros.projetos)
+  const query = params.toString()
+  return apiRequest<VisaoGlobalResumo>(`/api/visao-global/resumo${query ? `?${query}` : ''}`)
+}

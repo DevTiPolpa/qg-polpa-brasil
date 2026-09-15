@@ -14,6 +14,7 @@ import FunilVendas from './pages/FunilVendas'
 import PanoramaCrm from './pages/PanoramaCrm'
 import Chat from './pages/Chat'
 import SnapshotComparativo from './pages/SnapshotComparativo'
+import VisaoGlobal from './pages/VisaoGlobal'
 import HistoricoClientes from './pages/HistoricoClientes'
 import MovimentacaoClientesProdutos from './pages/MovimentacaoClientesProdutos'
 import Tarefas from './pages/Tarefas'
@@ -63,7 +64,8 @@ function AppRoutes() {
   return (
     <DashboardLayout user={user}>
       <Switch>
-        <Route path="/" component={Dashboard} />
+        <Route path="/" component={VisaoGlobal} />
+        <Route path="/dashboard" component={Dashboard} />
         <Route path="/vendedores" component={Vendedores} />
         <Route path="/projetos" component={NovosProjetos} />
         <Route path="/recorrentes" component={RecorrentesRealOrcado} />

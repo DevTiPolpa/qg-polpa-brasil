@@ -17,6 +17,21 @@ export function formatPercent(value: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'percent', maximumFractionDigits: 1 }).format(value / 100)
 }
 
+// Moeda com centavos (R$ 1.234.567,89) — formatCurrency acima arredonda pro inteiro,
+// usado nos cards antigos; esta é para tabelas que precisam do valor exato.
+export function formatCurrencyExato(value: number): string {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+}
+
+// Abreviação pra cards de KPI (R$ 124,84 mi) — sempre usar formatCurrencyExato no
+// title/tooltip ao lado, pra não esconder o valor exato.
+export function formatCurrencyAbrev(value: number): string {
+  const abs = Math.abs(value)
+  if (abs >= 1_000_000) return `R$ ${(value / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} mi`
+  if (abs >= 1_000) return `R$ ${(value / 1_000).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} mil`
+  return formatCurrencyExato(value)
+}
+
 const MES_ABREV = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
 export function formatMes(yyyyMM: string): string {

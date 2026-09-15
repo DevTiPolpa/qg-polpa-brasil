@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLocation } from 'wouter'
 import {
   LayoutDashboard, Users, UserCog, LogOut,
-  ChevronLeft, ChevronRight, FolderOpen, BarChart2, Target, Menu, X, MessageSquare, History, Gauge, ListChecks, ArrowLeftRight, ListTodo,
+  ChevronLeft, ChevronRight, FolderOpen, BarChart2, Target, Menu, X, MessageSquare, History, Gauge, ListChecks, ArrowLeftRight, ListTodo, Globe,
 } from 'lucide-react'
 import { logout } from '../lib/api'
 import NotificacoesBell from './NotificacoesBell'
@@ -11,8 +11,9 @@ const menuGroups = [
   {
     group: 'Visão Geral',
     items: [
-      { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-      { icon: ListTodo,        label: 'Tarefas',   path: '/tarefas' },
+      { icon: Globe,           label: 'Visão Global',   path: '/' },
+      { icon: LayoutDashboard, label: 'Dashboard',      path: '/dashboard' },
+      { icon: ListTodo,        label: 'Tarefas',        path: '/tarefas' },
     ],
   },
   {
