@@ -366,7 +366,7 @@ export default function SnapshotComparativo() {
                     onClick={() => setJanelaSemanas(op)}
                     className={`text-[11px] font-medium rounded px-2 py-1 transition-colors ${
                       janelaSemanas === op
-                        ? 'bg-violet-500/30 text-violet-200'
+                        ? theme === 'light' ? 'bg-primary/15 text-primary' : 'bg-violet-500/30 text-violet-200'
                         : 'text-slate-300 hover:text-foreground hover:bg-slate-600/60'
                     }`}
                     title={op === 'todas' ? 'Mostrar todo o histórico de snapshots' : `Mostrar apenas as últimas ${op} semanas`}
