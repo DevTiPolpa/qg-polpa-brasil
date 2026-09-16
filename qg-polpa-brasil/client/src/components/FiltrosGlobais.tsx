@@ -289,9 +289,13 @@ function PeriodoPicker({ filtros, onChange }: { filtros: Filtros; onChange: (f: 
 
 // ─── Componente principal ────────────────────────────────────────────────────
 export default function FiltrosGlobais({ filtros, onChange, showTipoReceita = true, showProjetos = true }: Props) {
+  // FiltrosGlobais só é usado nas 6 telas restritas aos mercados Nacional/Exportação/
+  // E-commerce Industrial (Dashboard, Histórico Clientes, Novos Projetos, Recorrentes
+  // R x O, Comparativo Semanal, Por Vendedor) — nunca em Movimentação de Clientes e
+  // Produtos, que tem seu próprio filtro de mercado com os 6 mercados.
   const { data: disponiveis } = useQuery({
-    queryKey: ["dashboard-original-filtros-disponiveis"],
-    queryFn: getDashboardOriginalFiltrosDisponiveis,
+    queryKey: ["dashboard-original-filtros-disponiveis", "restrito"],
+    queryFn: () => getDashboardOriginalFiltrosDisponiveis(true),
     staleTime: 5 * 60 * 1000,
   });
 

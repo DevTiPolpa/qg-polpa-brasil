@@ -638,8 +638,13 @@ export async function getDashboardOriginalRegiaoMix(regiao: string, filtros: Das
   return apiRequest<DashboardOriginalRegiaoMix[]>(`/api/dashboard-original/regioes/${encodeURIComponent(regiao)}/mix?${params.toString()}`)
 }
 
-export async function getDashboardOriginalFiltrosDisponiveis(): Promise<DashboardOriginalFiltrosDisponiveis> {
-  return apiRequest<DashboardOriginalFiltrosDisponiveis>('/api/dashboard-original/filtros-disponiveis')
+// apenasMercadosPermitidos=true restringe a lista de mercados retornada (usada pra
+// popular o multi-select) aos 3 mercados permitidos nas 6 telas restritas — ver
+// FiltrosGlobais.tsx e Vendedores.tsx. Movimentação de Clientes e Produtos chama
+// esta função sem o parâmetro (padrão false) e continua vendo os 6 mercados.
+export async function getDashboardOriginalFiltrosDisponiveis(apenasMercadosPermitidos = false): Promise<DashboardOriginalFiltrosDisponiveis> {
+  const query = apenasMercadosPermitidos ? '?apenasMercadosPermitidos=true' : ''
+  return apiRequest<DashboardOriginalFiltrosDisponiveis>(`/api/dashboard-original/filtros-disponiveis${query}`)
 }
 
 
