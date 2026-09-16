@@ -34,12 +34,18 @@ function safeStr(v: any, max = 255): string | null {
 }
 
 async function main() {
-  const filePath = path.join(__dirname, 'Orçamento 2026', 'Orçamento 2026 - Real.xls')
+  // Caminho canônico informado pelo usuário — o nome do arquivo/aba já mudou uma vez
+  // (era "Orçamento 2026 - Real.xls" / aba "Orçamento"; agora é este arquivo / aba
+  // "new sheet"), por isso a resolução de aba abaixo tem fallback em vez de fixar
+  // um nome só.
+  const filePath = 'C:/DEV/GITHUB ALEXANDRE/qg-polpa-brasil/Orçamento 2026 - Consolidado Comercial - Power Bi.xls'
   console.log('Lendo arquivo:', filePath)
 
   const wb = XLSX.readFile(filePath)
-  const ws = wb.Sheets['Orçamento']
-  if (!ws) throw new Error('Aba "Orçamento" não encontrada no arquivo')
+  const sheetName = wb.SheetNames.includes('Orçamento') ? 'Orçamento' : wb.SheetNames[0]
+  console.log('Usando aba:', sheetName, '(abas disponíveis:', wb.SheetNames.join(', '), ')')
+  const ws = wb.Sheets[sheetName]
+  if (!ws) throw new Error(`Aba "${sheetName}" não encontrada no arquivo`)
 
   const rows = XLSX.utils.sheet_to_json<any>(ws, { defval: null })
   console.log(`Total de linhas lidas: ${rows.length}`)
