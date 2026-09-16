@@ -15,6 +15,7 @@ import ComentarioIndicador from '../components/ComentarioIndicador'
 import { useTarefasPorOrigem } from '../hooks/useTarefasPorOrigem'
 import { useComentariosPorOrigem } from '../hooks/useComentariosPorOrigem'
 import { TIPOS_OCORRENCIA_POR_ORIGEM } from '../lib/tarefas'
+import { useTheme } from '../hooks/useTheme'
 
 const TIPOS_OCORRENCIA_SNAPSHOT = TIPOS_OCORRENCIA_POR_ORIGEM.COMPARATIVO_SEMANAL
 
@@ -235,6 +236,7 @@ function ClienteRow({ row, dates, filtros, contagemTarefas, onTarefaCriada, cont
 }
 
 export default function SnapshotComparativo() {
+  const { theme } = useTheme()
   const [filtros, setFiltros] = useState<Filtros>(DEFAULT_FILTROS)
   const [ordemDesc, setOrdemDesc] = useState(true)
   const [apenasComVariacao, setApenasComVariacao] = useState(false)
@@ -391,7 +393,7 @@ export default function SnapshotComparativo() {
                   </th>
                   {/* Uma coluna por snapshot */}
                   {dates.map(d => (
-                    <th key={d} className="text-right px-2 py-2.5 font-medium text-violet-400 w-[110px] whitespace-nowrap">
+                    <th key={d} className={`text-right px-2 py-2.5 font-medium w-[110px] whitespace-nowrap ${theme === 'light' ? 'text-foreground' : 'text-violet-400'}`}>
                       {fmtDateFull(d)}
                     </th>
                   ))}

@@ -218,10 +218,13 @@ export default function DashboardLayout({ children, user }: Props) {
           </div>
         </div>
 
-        {/* Toggle de tema — canto superior direito, visível em toda tela autenticada */}
-        <ThemeToggle className="hidden md:flex fixed top-4 right-4 z-50 shadow-sm" />
-
         <div className="w-full px-3 py-4 md:px-6 md:py-6">
+          {/* Toggle de tema — dentro do fluxo normal do conteúdo (não fixed),
+              pra nunca sobrepor o cabeçalho/status que cada tela desenha no
+              próprio canto superior direito. */}
+          <div className="hidden md:flex justify-end mb-2 -mt-1">
+            <ThemeToggle />
+          </div>
           {children}
         </div>
       </main>
