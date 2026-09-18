@@ -188,6 +188,8 @@ function DetalheTarefa({ taskId, onClose, onChanged }: { taskId: number; onClose
   // Só quem criou a tarefa pode excluí-la — sem restrição de status (diferente do
   // Tipo de Ocorrência, que só é editável enquanto Pendente).
   const podeExcluir = Boolean(task && user && task.criadoPorId === user.id);
+  // Prazo só pode ser alterado por administradores — vendedores só visualizam.
+  const podeEditarPrazo = user?.role === "ADMIN";
 
   async function handleExcluir() {
     if (!task) return;
@@ -214,7 +216,7 @@ function DetalheTarefa({ taskId, onClose, onChanged }: { taskId: number; onClose
         acoes,
         status,
         responsavelId: responsavelId === "" ? undefined : Number(responsavelId),
-        prazo,
+        ...(podeEditarPrazo ? { prazo } : {}),
         ...(podeEditarTipoOcorrencia ? { tipoOcorrencia } : {}),
       });
       await refetch();
@@ -339,12 +341,15 @@ function DetalheTarefa({ taskId, onClose, onChanged }: { taskId: number; onClose
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-muted-foreground mb-1.5">Prazo</label>
+                  <label className="block text-xs text-muted-foreground mb-1.5">
+                    Prazo{!podeEditarPrazo && <span className="text-[10px] text-muted-foreground/70"> (somente administradores podem alterar)</span>}
+                  </label>
                   <input
                     type="date"
                     value={prazo}
                     onChange={e => setPrazo(e.target.value)}
-                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                    disabled={!podeEditarPrazo}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
