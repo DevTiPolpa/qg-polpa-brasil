@@ -413,9 +413,12 @@ export default function MovimentacaoClientesProdutos() {
   const mercadosFiltro = mercadosSelecionados.length ? mercadosSelecionados : undefined;
   const vendedoresFiltro = vendedoresSelecionados.length ? vendedoresSelecionados : undefined;
 
+  // Restrita aos mercados de MERCADOS_PERMITIDOS_DASHBOARD — mesmo padrão das
+  // outras 6 telas (Dashboard, Tarefas, Por Vendedor, Novos Projetos, Histórico
+  // Clientes, Comparativo Semanal, Recorrentes R x O).
   const { data: filtrosDisponiveis } = useQuery({
-    queryKey: ["dashboard-original-filtros-disponiveis"],
-    queryFn: () => getDashboardOriginalFiltrosDisponiveis(),
+    queryKey: ["dashboard-original-filtros-disponiveis", "restrito"],
+    queryFn: () => getDashboardOriginalFiltrosDisponiveis(true),
     staleTime: 5 * 60_000,
   });
   const mercadosDisponiveis = filtrosDisponiveis?.mercados ?? [];
