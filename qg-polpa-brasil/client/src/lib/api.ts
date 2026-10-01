@@ -1303,6 +1303,41 @@ export async function getPanoramaDeals(filtros: PanoramaCrmFiltros): Promise<Pan
   return apiRequest<PanoramaDealsResponse>(`/api/panorama-crm/deals${buildPanoramaCrmParams(filtros)}`)
 }
 
+// ─── Detalhe (drill-down): lista os negócios/leads por trás de uma célula ─────
+export type DetalheNegocioRow = {
+  id: number
+  titulo: string
+  vendedor: string
+  valor: number | null
+  etapa: string | null
+  data: string | null
+}
+
+export type PanoramaLeadsMetrica = 'criados' | 'comMovimentacao' | 'convertidos' | 'perdidos'
+export type PanoramaDealsMetrica = 'criados' | 'ganhos' | 'perdidos'
+
+export async function getPanoramaLeadsDetalhe(filtros: {
+  dateIni: string; dateFim: string; periodo: string; metrica: PanoramaLeadsMetrica; visao: PanoramaCrmVisao
+}): Promise<DetalheNegocioRow[]> {
+  const params = new URLSearchParams({
+    dateIni: filtros.dateIni, dateFim: filtros.dateFim, periodo: filtros.periodo,
+    metrica: filtros.metrica, visao: filtros.visao,
+  })
+  const { rows } = await apiRequest<{ rows: DetalheNegocioRow[] }>(`/api/panorama-crm/leads/detalhe?${params}`)
+  return rows
+}
+
+export async function getPanoramaDealsDetalhe(filtros: {
+  periodo: string; metrica: PanoramaDealsMetrica; visao: PanoramaCrmVisao
+  pipelineId: number | null; origem: PanoramaCrmOrigem; userId?: number
+}): Promise<DetalheNegocioRow[]> {
+  const params = new URLSearchParams({ periodo: filtros.periodo, metrica: filtros.metrica, visao: filtros.visao, origem: filtros.origem })
+  if (filtros.pipelineId != null) params.set('pipelineId', String(filtros.pipelineId))
+  if (filtros.userId != null) params.set('userId', String(filtros.userId))
+  const { rows } = await apiRequest<{ rows: DetalheNegocioRow[] }>(`/api/panorama-crm/deals/detalhe?${params}`)
+  return rows
+}
+
 // =============================================================================
 // Agente IA / Chatbot — helpers REST
 // =============================================================================
@@ -1442,6 +1477,27 @@ export type FunilScorecardResponse = {
 
 export async function getFunilScorecardDashboard(recorte: FunilScorecardRecorte): Promise<FunilScorecardResponse> {
   return apiRequest<FunilScorecardResponse>(`/api/funil-scorecard/dashboard?recorte=${recorte}`)
+}
+
+export type FunilScorecardCadenciaMetrica = 'abertos' | 'ganhos' | 'perdidos' | 'avancaram'
+export type FunilScorecardSaudeMetrica = 'ativos' | 'foraSla' | 'semFollowup'
+
+export async function getFunilScorecardCadenciaDetalhe(
+  recorte: FunilScorecardCadenciaKey, metrica: FunilScorecardCadenciaMetrica, userId?: number
+): Promise<DetalheNegocioRow[]> {
+  const params = new URLSearchParams({ recorte, metrica })
+  if (userId != null) params.set('userId', String(userId))
+  const { rows } = await apiRequest<{ rows: DetalheNegocioRow[] }>(`/api/funil-scorecard/cadencia/detalhe?${params}`)
+  return rows
+}
+
+export async function getFunilScorecardSaudeDetalhe(
+  metrica: FunilScorecardSaudeMetrica, userId?: number
+): Promise<DetalheNegocioRow[]> {
+  const params = new URLSearchParams({ metrica })
+  if (userId != null) params.set('userId', String(userId))
+  const { rows } = await apiRequest<{ rows: DetalheNegocioRow[] }>(`/api/funil-scorecard/saude/detalhe?${params}`)
+  return rows
 }
 
 // ─── Geração de Listas ─────────────────────────────────────────────────────

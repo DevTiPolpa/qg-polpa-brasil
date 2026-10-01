@@ -3,20 +3,46 @@ import { useQuery } from '@tanstack/react-query'
 import { Calendar, TrendingUp, CheckCircle, XCircle, Clock, Users, Target, DollarSign } from 'lucide-react'
 import { Card, CardContent } from '../components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
+import DetalheNegociosModal from '../components/DetalheNegociosModal'
 import {
   getPanoramaCrmVendedores,
   getPanoramaDeals,
   getPanoramaDealsSnapshot,
   getPanoramaLeads,
   getPanoramaLeadsSnapshot,
+  getPanoramaLeadsDetalhe,
+  getPanoramaDealsDetalhe,
   type PanoramaCrmOrigem,
   type PanoramaCrmVisao,
   type PanoramaDealRow,
   type PanoramaDealsCalendarioResponse,
   type PanoramaLeadRow,
   type PanoramaLeadsCalendarioResponse,
+  type PanoramaLeadsMetrica,
+  type PanoramaDealsMetrica,
 } from '../lib/api'
 import { formatCurrency, formatNumber, formatMes } from '../lib/utils'
+
+// ─── Célula clicável (abre o modal de detalhe) ────────────────────────────────
+function CelulaClicavel({ valor, formatado, className, onClick }: {
+  valor: number; formatado: string; className?: string; onClick: () => void
+}) {
+  if (!valor) return <span className={className}>{formatado}</span>
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`hover:underline underline-offset-2 decoration-dotted cursor-pointer ${className ?? ''}`}
+      title="Clique para ver os negócios/leads"
+    >
+      {formatado}
+    </button>
+  )
+}
+
+// ─── Estado do modal de detalhe (leads) ────────────────────────────────────────
+type DetalheLeadsState = { periodo: string; metrica: PanoramaLeadsMetrica; label: string } | null
+type DetalheDealsState = { periodo: string; metrica: PanoramaDealsMetrica; label: string } | null
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function Skeleton({ className = '' }: { className?: string }) {
@@ -135,6 +161,8 @@ function DealsSection({
   const totValor   = rows.reduce((s, r) => s + r.valorGanhos, 0)
   const taxaTotal  = snap ? totGanhos / Math.max(snap.emAndamento + totGanhos + totPerdidos, 1) * 100 : null
 
+  const [detalhe, setDetalhe] = useState<DetalheDealsState>(null)
+
   return (
     <div className="space-y-4">
       <div>
@@ -172,10 +200,19 @@ function DealsSection({
                 {rows.map(r => (
                   <TableRow key={r.periodo}>
                     <TableCell className="font-medium">{formatMes(r.periodo)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{formatNumber(r.criados)}</TableCell>
-                    <TableCell className="text-right text-green-400">{formatNumber(r.ganhos)}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      <CelulaClicavel valor={r.criados} formatado={formatNumber(r.criados)}
+                        onClick={() => setDetalhe({ periodo: r.periodo, metrica: 'criados', label: `Criados — ${formatMes(r.periodo)}` })} />
+                    </TableCell>
+                    <TableCell className="text-right text-green-400">
+                      <CelulaClicavel valor={r.ganhos} formatado={formatNumber(r.ganhos)}
+                        onClick={() => setDetalhe({ periodo: r.periodo, metrica: 'ganhos', label: `Ganhos — ${formatMes(r.periodo)}` })} />
+                    </TableCell>
                     <TableCell className="text-right text-green-400">{formatCurrency(r.valorGanhos)}</TableCell>
-                    <TableCell className="text-right text-red-400">{formatNumber(r.perdidos)}</TableCell>
+                    <TableCell className="text-right text-red-400">
+                      <CelulaClicavel valor={r.perdidos} formatado={formatNumber(r.perdidos)}
+                        onClick={() => setDetalhe({ periodo: r.periodo, metrica: 'perdidos', label: `Perdidos — ${formatMes(r.periodo)}` })} />
+                    </TableCell>
                     <TableCell className="text-right">{pct(r.taxaConv)}</TableCell>
                     <TableCell className="text-right text-muted-foreground">{dias(r.cicloTotal)}</TableCell>
                     <TableCell className="text-right">{dias(r.cicloGanhos)}</TableCell>
@@ -189,6 +226,16 @@ function DealsSection({
           )}
         </CardContent>
       </Card>
+
+      <DetalheNegociosModal
+        open={detalhe != null}
+        onClose={() => setDetalhe(null)}
+        title={detalhe ? `${title} · ${detalhe.label}` : ''}
+        queryKey={['panorama-crm', 'deals-detalhe', pipelineId, origem, userId, visao, detalhe]}
+        queryFn={() => getPanoramaDealsDetalhe({
+          periodo: detalhe!.periodo, metrica: detalhe!.metrica, visao, pipelineId, origem, userId,
+        })}
+      />
     </div>
   )
 }
@@ -246,6 +293,8 @@ export default function PanoramaCrm() {
   const totConv = leadsRows.reduce((s, r) => s + r.convertidos, 0)
   const totPerdL = leadsRows.reduce((s, r) => s + r.perdidos, 0)
   const taxaLeads = (leadsSnap + totConv + totPerdL) > 0 ? totConv / (leadsSnap + totConv + totPerdL) * 100 : 0
+
+  const [detalheLeads, setDetalheLeads] = useState<DetalheLeadsState>(null)
 
   return (
     <div className="space-y-8 fade-in">
@@ -351,10 +400,22 @@ export default function PanoramaCrm() {
                   {leadsRows.map(r => (
                     <TableRow key={r.periodo}>
                       <TableCell className="font-medium">{formatMes(r.periodo)}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{formatNumber(r.criados)}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{formatNumber(r.comMovimentacao)}</TableCell>
-                      <TableCell className="text-right text-green-400">{formatNumber(r.convertidos)}</TableCell>
-                      <TableCell className="text-right text-red-400">{formatNumber(r.perdidos)}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        <CelulaClicavel valor={r.criados} formatado={formatNumber(r.criados)}
+                          onClick={() => setDetalheLeads({ periodo: r.periodo, metrica: 'criados', label: `Criados — ${formatMes(r.periodo)}` })} />
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        <CelulaClicavel valor={r.comMovimentacao} formatado={formatNumber(r.comMovimentacao)}
+                          onClick={() => setDetalheLeads({ periodo: r.periodo, metrica: 'comMovimentacao', label: `Movimentação — ${formatMes(r.periodo)}` })} />
+                      </TableCell>
+                      <TableCell className="text-right text-green-400">
+                        <CelulaClicavel valor={r.convertidos} formatado={formatNumber(r.convertidos)}
+                          onClick={() => setDetalheLeads({ periodo: r.periodo, metrica: 'convertidos', label: `Convertidos — ${formatMes(r.periodo)}` })} />
+                      </TableCell>
+                      <TableCell className="text-right text-red-400">
+                        <CelulaClicavel valor={r.perdidos} formatado={formatNumber(r.perdidos)}
+                          onClick={() => setDetalheLeads({ periodo: r.periodo, metrica: 'perdidos', label: `Perdidos — ${formatMes(r.periodo)}` })} />
+                      </TableCell>
                       <TableCell className="text-right">{pct(r.taxaConv)}</TableCell>
                       <TableCell className="text-right">{dias(r.cicloMedio)}</TableCell>
                     </TableRow>
@@ -367,6 +428,16 @@ export default function PanoramaCrm() {
             )}
           </CardContent>
         </Card>
+
+        <DetalheNegociosModal
+          open={detalheLeads != null}
+          onClose={() => setDetalheLeads(null)}
+          title={detalheLeads ? `Geração de Demanda — Leads · ${detalheLeads.label}` : ''}
+          queryKey={['panorama-crm', 'leads-detalhe', visao, detalheLeads]}
+          queryFn={() => getPanoramaLeadsDetalhe({
+            dateIni, dateFim, periodo: detalheLeads!.periodo, metrica: detalheLeads!.metrica, visao,
+          })}
+        />
       </div>
 
       <div className="space-y-4">

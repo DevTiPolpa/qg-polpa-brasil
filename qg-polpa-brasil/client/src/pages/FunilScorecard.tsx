@@ -3,18 +3,45 @@ import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, CheckCircle2, XCircle, HelpCircle, X } from 'lucide-react'
 import {
   getFunilScorecardDashboard,
+  getFunilScorecardCadenciaDetalhe,
+  getFunilScorecardSaudeDetalhe,
   type FunilScorecardRecorte as TabRecorte,
   type FunilScorecardCadenciaKey as Recorte,
   type FunilScorecardCor as Cor,
   type FunilScorecardCadenciaVendedorRow as CadenciaVendedorRow,
   type FunilScorecardCadenciaRecorte as CadenciaRecorteData,
   type FunilScorecardLuzes as Luzes,
+  type FunilScorecardCadenciaMetrica,
+  type FunilScorecardSaudeMetrica,
 } from '../lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog'
 import { Tabs } from '../components/ui/tabs'
+import DetalheNegociosModal from '../components/DetalheNegociosModal'
 import { formatCurrency, formatNumber, formatPercent } from '../lib/utils'
+
+// Mesma lista fixa de vendedoras do placar usada no backend (FUNIL_SCORECARD_VENDEDORES
+// em app/database.py) — só pra resolver nome -> id ao clicar numa célula (TOTAL = sem id,
+// backend já entende "sem userId" como os 4 do placar somados).
+const VENDEDOR_ID_POR_NOME: Record<string, number> = {
+  'Julia Alberti': 151,
+  'Talia Stefani Scain': 289,
+  'Jennifer Anacleto': 365,
+  'Tatiana Evangelista': 397,
+}
+
+type DetalheState =
+  | { tipo: 'cadencia'; recorte: Recorte; metrica: FunilScorecardCadenciaMetrica; userId?: number; label: string }
+  | { tipo: 'saude'; metrica: FunilScorecardSaudeMetrica; userId?: number; label: string }
+  | null
+
+const CADENCIA_METRICA_LABEL: Record<FunilScorecardCadenciaMetrica, string> = {
+  abertos: 'Abertos', ganhos: 'Ganhos', perdidos: 'Perdidos', avancaram: 'Avançaram',
+}
+const SAUDE_METRICA_LABEL: Record<FunilScorecardSaudeMetrica, string> = {
+  ativos: 'Ativos', foraSla: 'Fora do SLA', semFollowup: 'Sem follow-up',
+}
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
 const TABS: { value: TabRecorte; label: string }[] = [
@@ -107,8 +134,21 @@ function Skeleton({ className = '' }: { className?: string }) {
   return <div className={`bg-muted animate-pulse rounded ${className}`} />
 }
 
+// ─── Célula clicável (abre o modal de drill-down) ─────────────────────────────
+function CelulaClicavel({ valor, formatado, onClick }: { valor: number; formatado: string; onClick: () => void }) {
+  if (!valor) return <>{formatado}</>
+  return (
+    <button type="button" onClick={onClick} className="hover:underline underline-offset-2 decoration-dotted cursor-pointer" title="Clique para ver os negócios">
+      {formatado}
+    </button>
+  )
+}
+
 // ─── Tabela de Cadência (reaproveitada pra tabela principal e a de comparação) ─
-function CadenciaTable({ dados, mostrarCor, luzes }: { dados: CadenciaRecorteData; mostrarCor: boolean; luzes: Luzes | null }) {
+function CadenciaTable({ dados, recorte, mostrarCor, luzes, onCelulaClick }: {
+  dados: CadenciaRecorteData; recorte: Recorte; mostrarCor: boolean; luzes: Luzes | null
+  onCelulaClick: (recorte: Recorte, metrica: FunilScorecardCadenciaMetrica, userId?: number, label?: string) => void
+}) {
   return (
     <Table>
       <TableHeader>
@@ -122,25 +162,42 @@ function CadenciaTable({ dados, mostrarCor, luzes }: { dados: CadenciaRecorteDat
         </TableRow>
       </TableHeader>
       <TableBody>
-        {dados.vendedores.map(v => (
-          <TableRow key={v.nome}>
-            <TableCell className="font-medium">{v.nome}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatNumber(v.abertos)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatNumber(v.ganhos)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatNumber(v.perdidos)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatNumber(v.avancaram)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatSaldo(v.saldo)}</TableCell>
-          </TableRow>
-        ))}
+        {dados.vendedores.map(v => {
+          const userId = VENDEDOR_ID_POR_NOME[v.nome]
+          return (
+            <TableRow key={v.nome}>
+              <TableCell className="font-medium">{v.nome}</TableCell>
+              <TableCell className="text-right tabular-nums">
+                <CelulaClicavel valor={v.abertos} formatado={formatNumber(v.abertos)} onClick={() => onCelulaClick(recorte, 'abertos', userId, v.nome)} />
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                <CelulaClicavel valor={v.ganhos} formatado={formatNumber(v.ganhos)} onClick={() => onCelulaClick(recorte, 'ganhos', userId, v.nome)} />
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                <CelulaClicavel valor={v.perdidos} formatado={formatNumber(v.perdidos)} onClick={() => onCelulaClick(recorte, 'perdidos', userId, v.nome)} />
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                <CelulaClicavel valor={v.avancaram} formatado={formatNumber(v.avancaram)} onClick={() => onCelulaClick(recorte, 'avancaram', userId, v.nome)} />
+              </TableCell>
+              <TableCell className="text-right tabular-nums">{formatSaldo(v.saldo)}</TableCell>
+            </TableRow>
+          )
+        })}
         <TableRow className="font-semibold border-t-2 border-border">
           <TableCell>TOTAL</TableCell>
-          <TableCell className="text-right tabular-nums">{formatNumber(dados.totais.abertos)}</TableCell>
-          <TableCell className="text-right tabular-nums">{formatNumber(dados.totais.ganhos)}</TableCell>
           <TableCell className="text-right tabular-nums">
-            {formatNumber(dados.totais.perdidos)}
+            <CelulaClicavel valor={dados.totais.abertos} formatado={formatNumber(dados.totais.abertos)} onClick={() => onCelulaClick(recorte, 'abertos', undefined, 'TOTAL')} />
+          </TableCell>
+          <TableCell className="text-right tabular-nums">
+            <CelulaClicavel valor={dados.totais.ganhos} formatado={formatNumber(dados.totais.ganhos)} onClick={() => onCelulaClick(recorte, 'ganhos', undefined, 'TOTAL')} />
+          </TableCell>
+          <TableCell className="text-right tabular-nums">
+            <CelulaClicavel valor={dados.totais.perdidos} formatado={formatNumber(dados.totais.perdidos)} onClick={() => onCelulaClick(recorte, 'perdidos', undefined, 'TOTAL')} />
             {mostrarCor && luzes && <span className="text-muted-foreground font-normal"> ({formatNumber(luzes.taxaPerda, 1)}%)</span>}
           </TableCell>
-          <TableCell className="text-right tabular-nums">{formatNumber(dados.totais.avancaram)}</TableCell>
+          <TableCell className="text-right tabular-nums">
+            <CelulaClicavel valor={dados.totais.avancaram} formatado={formatNumber(dados.totais.avancaram)} onClick={() => onCelulaClick(recorte, 'avancaram', undefined, 'TOTAL')} />
+          </TableCell>
           <TableCell className="text-right tabular-nums">{formatSaldo(dados.totais.saldo)}</TableCell>
         </TableRow>
       </TableBody>
@@ -327,6 +384,14 @@ function AjudaModal({ open, onClose }: { open: boolean; onClose: () => void }) {
 export default function FunilScorecard() {
   const [recorte, setRecorte] = useState<TabRecorte>('semana_anterior')
   const [ajudaOpen, setAjudaOpen] = useState(false)
+  const [detalhe, setDetalhe] = useState<DetalheState>(null)
+
+  function abrirDetalheCadencia(recorteCel: Recorte, metrica: FunilScorecardCadenciaMetrica, userId?: number, nome?: string) {
+    setDetalhe({ tipo: 'cadencia', recorte: recorteCel, metrica, userId, label: `${CADENCIA_METRICA_LABEL[metrica]} — ${nome ?? 'TOTAL'} (${RECORTE_LABEL[recorteCel]})` })
+  }
+  function abrirDetalheSaude(metrica: FunilScorecardSaudeMetrica, userId?: number, nome?: string) {
+    setDetalhe({ tipo: 'saude', metrica, userId, label: `${SAUDE_METRICA_LABEL[metrica]} — ${nome ?? 'TOTAL'}` })
+  }
 
   const query = useQuery({
     queryKey: ['funil-scorecard', 'dashboard', recorte],
@@ -439,14 +504,14 @@ export default function FunilScorecard() {
                 />
               </div>
 
-              <CadenciaTable dados={data.cadencia[recorte]} mostrarCor={!!data.luzes} luzes={data.luzes} />
+              <CadenciaTable dados={data.cadencia[recorte]} recorte={recorte} mostrarCor={!!data.luzes} luzes={data.luzes} onCelulaClick={abrirDetalheCadencia} />
 
               {COMPARACAO[recorte] && (
                 <div>
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                     {COMPARACAO[recorte]!.label}
                   </h4>
-                  <CadenciaTable dados={data.cadencia[COMPARACAO[recorte]!.recorte]} mostrarCor={false} luzes={null} />
+                  <CadenciaTable dados={data.cadencia[COMPARACAO[recorte]!.recorte]} recorte={COMPARACAO[recorte]!.recorte} mostrarCor={false} luzes={null} onCelulaClick={abrirDetalheCadencia} />
                 </div>
               )}
             </CardContent>
@@ -471,33 +536,50 @@ export default function FunilScorecard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.saude.porVendedor.map(v => (
-                    <TableRow key={v.nome}>
-                      <TableCell className="font-medium">{v.nome}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatNumber(v.ativos)}</TableCell>
-                      <TableCell>
-                        <CorPill cor={corPctSla(v.pctSla)}>
-                          {v.pctSla != null ? `${formatNumber(v.foraSla)} (${formatPercent(v.pctSla)})` : '—'}
-                        </CorPill>
-                      </TableCell>
-                      <TableCell>
-                        <CorPill cor={corPctFu(v.pctFu)}>
-                          {v.pctFu != null ? `${formatNumber(v.semFollowup)} (${formatPercent(v.pctFu)})` : '—'}
-                        </CorPill>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {data.saude.porVendedor.map(v => {
+                    const userId = VENDEDOR_ID_POR_NOME[v.nome]
+                    return (
+                      <TableRow key={v.nome}>
+                        <TableCell className="font-medium">{v.nome}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {userId != null
+                            ? <CelulaClicavel valor={v.ativos} formatado={formatNumber(v.ativos)} onClick={() => abrirDetalheSaude('ativos', userId, v.nome)} />
+                            : formatNumber(v.ativos)}
+                        </TableCell>
+                        <TableCell>
+                          <CorPill cor={corPctSla(v.pctSla)}>
+                            {v.pctSla != null ? (
+                              userId != null
+                                ? <CelulaClicavel valor={v.foraSla} formatado={`${formatNumber(v.foraSla)} (${formatPercent(v.pctSla)})`} onClick={() => abrirDetalheSaude('foraSla', userId, v.nome)} />
+                                : `${formatNumber(v.foraSla)} (${formatPercent(v.pctSla)})`
+                            ) : '—'}
+                          </CorPill>
+                        </TableCell>
+                        <TableCell>
+                          <CorPill cor={corPctFu(v.pctFu)}>
+                            {v.pctFu != null ? (
+                              userId != null
+                                ? <CelulaClicavel valor={v.semFollowup} formatado={`${formatNumber(v.semFollowup)} (${formatPercent(v.pctFu)})`} onClick={() => abrirDetalheSaude('semFollowup', userId, v.nome)} />
+                                : `${formatNumber(v.semFollowup)} (${formatPercent(v.pctFu)})`
+                            ) : '—'}
+                          </CorPill>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
                   <TableRow className="font-semibold border-t-2 border-border">
                     <TableCell>TOTAL</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.saude.totalAtivos)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      <CelulaClicavel valor={data.saude.totalAtivos} formatado={formatNumber(data.saude.totalAtivos)} onClick={() => abrirDetalheSaude('ativos', undefined, 'TOTAL')} />
+                    </TableCell>
                     <TableCell>
                       <CorPill cor={corPctSla(data.saude.pctSlaAgregado)}>
-                        {formatNumber(data.saude.totalForaSla)} ({formatPercent(data.saude.pctSlaAgregado)})
+                        <CelulaClicavel valor={data.saude.totalForaSla} formatado={`${formatNumber(data.saude.totalForaSla)} (${formatPercent(data.saude.pctSlaAgregado)})`} onClick={() => abrirDetalheSaude('foraSla', undefined, 'TOTAL')} />
                       </CorPill>
                     </TableCell>
                     <TableCell>
                       <CorPill cor={corPctFu(data.saude.pctFuAgregado)}>
-                        {formatNumber(data.saude.totalSemFollowup)} ({formatPercent(data.saude.pctFuAgregado)})
+                        <CelulaClicavel valor={data.saude.totalSemFollowup} formatado={`${formatNumber(data.saude.totalSemFollowup)} (${formatPercent(data.saude.pctFuAgregado)})`} onClick={() => abrirDetalheSaude('semFollowup', undefined, 'TOTAL')} />
                       </CorPill>
                     </TableCell>
                   </TableRow>
@@ -547,6 +629,16 @@ export default function FunilScorecard() {
       )}
 
       <AjudaModal open={ajudaOpen} onClose={() => setAjudaOpen(false)} />
+
+      <DetalheNegociosModal
+        open={detalhe != null}
+        onClose={() => setDetalhe(null)}
+        title={detalhe?.label ?? ''}
+        queryKey={['funil-scorecard', 'detalhe', detalhe]}
+        queryFn={() => detalhe?.tipo === 'cadencia'
+          ? getFunilScorecardCadenciaDetalhe(detalhe.recorte, detalhe.metrica, detalhe.userId)
+          : getFunilScorecardSaudeDetalhe(detalhe!.metrica as FunilScorecardSaudeMetrica, detalhe!.userId)}
+      />
     </div>
   )
 }
