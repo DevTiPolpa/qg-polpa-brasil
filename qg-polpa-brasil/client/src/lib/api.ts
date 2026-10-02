@@ -1865,12 +1865,12 @@ export async function deleteTask(id: number): Promise<void> {
 // uma tarefa. Fase 1: só in-app (sino no menu), sem e-mail.
 // ============================================================
 
-export type NotificacaoTipo = 'TAREFA_ATRIBUIDA' | 'TAREFA_REATRIBUIDA' | 'TAREFA_VENCIDA'
+export type NotificacaoTipo = 'TAREFA_ATRIBUIDA' | 'TAREFA_REATRIBUIDA' | 'TAREFA_VENCIDA' | 'SYNC_BITRIX_ATRASADO'
 
 export type ApiNotificacao = {
   id: number
   tipo: NotificacaoTipo
-  taskId: number
+  taskId: number | null
   titulo: string
   mensagem: string
   lida: boolean
@@ -1963,9 +1963,13 @@ export type VisaoGlobalFiltros = {
   meses?: number[]
   codProdutos?: number[]
   gruposProduto?: string[]
-  tipoReceita?: VisaoGlobalTipoReceita
+  // Seleção múltipla (cards clicáveis + dropdown de tipo, já unidos pelo chamador).
+  tipoReceita?: VisaoGlobalTipoReceita[]
   mercados?: string[]
   projetos?: string[]
+  // Cliente selecionado no Detalhamento de Vendas — escopa resumo/gráfico (não a
+  // própria tabela de clientes, que não recebe este campo).
+  codParcs?: number[]
 }
 
 export type VisaoGlobalLinhaMercado = {
@@ -2021,6 +2025,8 @@ export type VisaoGlobalResumo = {
   kpis: {
     orcamentoTotalRS: number
     realizadoTotalRS: number | null
+    previsaoTotalRS: number | null
+    previsaoTotalKG: number | null
     desvioRS: number | null
     atingimentoPct: number | null
     orcamentoKG: number
@@ -2028,10 +2034,45 @@ export type VisaoGlobalResumo = {
     vendaFirmeTotalRS: number | null
     novoProjetoTotalRS: number | null
     forecastTotalRS: number | null
-    tipoReceitaSelecionado: VisaoGlobalTipoReceita | null
+    tipoReceitaSelecionados: VisaoGlobalTipoReceita[]
   }
   mensal: VisaoGlobalMes[]
   diagnostico: VisaoGlobalDiagnostico
+}
+
+export type VisaoGlobalClienteItem = {
+  codParc: number
+  razaoSocial: string
+  valor: number
+  volume: number
+  precoMedio: number
+  qtdProdutos: number
+  pctValor: number
+  pctVolume: number
+  ultimaCompra: string | null
+}
+
+export type VisaoGlobalClienteProdutoItem = {
+  codProduto: string
+  nomeProduto: string
+  volume: number
+  valor: number
+  precoMedio: number
+  dtUltimaCompra: string | null
+}
+
+function buildVisaoGlobalParams(filtros: VisaoGlobalFiltros = {}): string {
+  const params = new URLSearchParams()
+  if (filtros.ano != null) params.set('ano', String(filtros.ano))
+  appendArrayParam(params, 'meses', filtros.meses?.map(String))
+  appendArrayParam(params, 'codProdutos', filtros.codProdutos?.map(String))
+  appendArrayParam(params, 'gruposProduto', filtros.gruposProduto)
+  appendArrayParam(params, 'tipoReceita', filtros.tipoReceita)
+  appendArrayParam(params, 'mercados', filtros.mercados)
+  appendArrayParam(params, 'projetos', filtros.projetos)
+  appendArrayParam(params, 'codParcs', filtros.codParcs?.map(String))
+  const query = params.toString()
+  return query ? `?${query}` : ''
 }
 
 export async function getVisaoGlobalFiltrosDisponiveis(): Promise<VisaoGlobalFiltrosDisponiveis> {
@@ -2039,14 +2080,13 @@ export async function getVisaoGlobalFiltrosDisponiveis(): Promise<VisaoGlobalFil
 }
 
 export async function getVisaoGlobalResumo(filtros: VisaoGlobalFiltros = {}): Promise<VisaoGlobalResumo> {
-  const params = new URLSearchParams()
-  if (filtros.ano != null) params.set('ano', String(filtros.ano))
-  appendArrayParam(params, 'meses', filtros.meses?.map(String))
-  appendArrayParam(params, 'codProdutos', filtros.codProdutos?.map(String))
-  appendArrayParam(params, 'gruposProduto', filtros.gruposProduto)
-  if (filtros.tipoReceita) params.set('tipoReceita', filtros.tipoReceita)
-  appendArrayParam(params, 'mercados', filtros.mercados)
-  appendArrayParam(params, 'projetos', filtros.projetos)
-  const query = params.toString()
-  return apiRequest<VisaoGlobalResumo>(`/api/visao-global/resumo${query ? `?${query}` : ''}`)
+  return apiRequest<VisaoGlobalResumo>(`/api/visao-global/resumo${buildVisaoGlobalParams(filtros)}`)
+}
+
+export async function getVisaoGlobalClientes(filtros: VisaoGlobalFiltros = {}): Promise<VisaoGlobalClienteItem[]> {
+  return apiRequest<VisaoGlobalClienteItem[]>(`/api/visao-global/clientes${buildVisaoGlobalParams(filtros)}`)
+}
+
+export async function getVisaoGlobalClienteProdutos(codParc: number, filtros: VisaoGlobalFiltros = {}): Promise<VisaoGlobalClienteProdutoItem[]> {
+  return apiRequest<VisaoGlobalClienteProdutoItem[]>(`/api/visao-global/clientes/${codParc}/produtos${buildVisaoGlobalParams(filtros)}`)
 }

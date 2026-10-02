@@ -4,20 +4,34 @@ import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, Cell, LabelList,
 } from 'recharts'
 import {
-  getVisaoGlobalResumo, getVisaoGlobalFiltrosDisponiveis,
+  getVisaoGlobalResumo, getVisaoGlobalFiltrosDisponiveis, getVisaoGlobalClientes, getVisaoGlobalClienteProdutos,
   type VisaoGlobalFiltros, type VisaoGlobalLinhaMercado, type VisaoGlobalTipoReceita,
+  type VisaoGlobalClienteItem, type VisaoGlobalClienteProdutoItem,
 } from '../lib/api'
 import MultiSelect from '../components/MultiSelect'
 import { Button } from '../components/ui/button'
-import { formatCurrency, formatCurrencyExato, formatCurrencyAbrev, formatKg, formatPercent, tipoReceitaLabel } from '../lib/utils'
+import { formatCurrency, formatCurrencyExato, formatCurrencyAbrev, formatKg, formatPercent, formatNumber, formatData, tipoReceitaLabel } from '../lib/utils'
 import { COLORS, BORDER_L_COLOR } from '../lib/colors'
 import { useTheme } from '../hooks/useTheme'
-import { TrendingUp, TrendingDown, Target, DollarSign, Package, PackageCheck, AlertTriangle, Info, SlidersHorizontal, X, BarChart2, Calendar } from 'lucide-react'
+import { TrendingUp, TrendingDown, Target, DollarSign, Package, PackageCheck, AlertTriangle, Info, SlidersHorizontal, X, BarChart2, Calendar, ChevronRight } from 'lucide-react'
 import { Card, CardContent } from '../components/ui/card'
 
 // Mesma convenção de meses abreviados já usada em lib/utils.ts (MES_ABREV), duplicada
 // aqui só porque precisamos do índice (1-12) pra ida e volta com o filtro de meses.
 const MES_LABEL = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+// Rótulos do dropdown de Tipo — pedidos nesse texto exato ("Vendas Firmes"/"Projeto"),
+// diferente de tipoReceitaLabel() (usado nos 3 cards clicáveis, "Venda Firme"/"Novo
+// Projeto"), então um mapa dedicado em vez de reaproveitar aquele util.
+const TIPO_RECEITA_DROPDOWN_LABEL: Record<VisaoGlobalTipoReceita, string> = {
+  VENDA_FIRME: 'Vendas Firmes',
+  FORECAST: 'Forecast',
+  NOVO_PROJETO: 'Projeto',
+}
+const TIPO_RECEITA_DROPDOWN_OPTIONS = Object.values(TIPO_RECEITA_DROPDOWN_LABEL)
+const TIPO_RECEITA_POR_LABEL: Record<string, VisaoGlobalTipoReceita> = Object.fromEntries(
+  (Object.entries(TIPO_RECEITA_DROPDOWN_LABEL) as [VisaoGlobalTipoReceita, string][]).map(([tipo, label]) => [label, tipo])
+)
 
 function pctClass(v: number | null): string {
   if (v == null) return 'text-muted-foreground'
@@ -54,8 +68,26 @@ function GraficoTooltip({ active, payload, label, metric = 'faturamento' }: any)
   )
 }
 
-function KpiCard({ label, value, tooltip, icon: Icon, colorClass }: {
+// Variação % vs. mesmo período do ano anterior — mesmo padrão visual/cálculo do
+// YoYBadge já usado no Dashboard Executivo (verde se maior, vermelho se menor).
+function YoYBadge({ atual, anterior }: { atual: number; anterior?: number | null }) {
+  const { theme } = useTheme()
+  if (anterior == null || anterior === 0) return null
+  const pct = ((atual - anterior) / Math.abs(anterior)) * 100
+  const positivo = pct >= 0
+  const cor = theme === 'light'
+    ? (positivo ? 'text-[#166534] bg-[#16653422]' : 'text-[#991b1b] bg-[#991b1b22]')
+    : (positivo ? 'text-[oklch(0.65_0.20_145)] bg-[oklch(0.65_0.20_145_/_0.12)]' : 'text-[oklch(0.65_0.22_25)] bg-[oklch(0.65_0.22_25_/_0.12)]')
+  return (
+    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${cor}`}>
+      {positivo ? '↑' : '↓'} {Math.abs(pct).toFixed(1)}% vs. ano anterior
+    </span>
+  )
+}
+
+function KpiCard({ label, value, tooltip, icon: Icon, colorClass, atual, anterior }: {
   label: string; value: string; tooltip?: string; icon: React.ElementType; colorClass: string
+  atual?: number; anterior?: number | null
 }) {
   return (
     <div className={`bg-slate-800 border border-slate-700 border-l-4 ${colorClass} rounded-xl px-4 py-4`} title={tooltip}>
@@ -66,6 +98,11 @@ function KpiCard({ label, value, tooltip, icon: Icon, colorClass }: {
         </div>
       </div>
       <p className="text-lg font-bold text-foreground leading-none truncate">{value}</p>
+      {atual != null && (
+        <div className="mt-1.5">
+          <YoYBadge atual={atual} anterior={anterior} />
+        </div>
+      )}
     </div>
   )
 }
@@ -147,13 +184,10 @@ function PeriodoPickerVG({ ano, setAno, anosDisponiveis, mesesSel, setMesesSel }
   }, [])
 
   function toggleMesLocal(mesLabel: string) {
-    setMesesSel(prev => {
-      const atual = prev.length === 0 ? [...MES_LABEL] : prev
-      return atual.includes(mesLabel) ? atual.filter(m => m !== mesLabel) : [...atual, mesLabel]
-    })
+    setMesesSel(prev => (prev.includes(mesLabel) ? prev.filter(m => m !== mesLabel) : [...prev, mesLabel]))
   }
 
-  const todosSelecionados = mesesSel.length === 0 || mesesSel.length === MES_LABEL.length
+  const todosSelecionados = mesesSel.length === MES_LABEL.length
   const label = todosSelecionados
     ? `Ano ${ano}`
     : mesesSel.length <= 3
@@ -193,7 +227,7 @@ function PeriodoPickerVG({ ano, setAno, anosDisponiveis, mesesSel, setMesesSel }
               <input
                 type="checkbox"
                 checked={todosSelecionados}
-                onChange={() => setMesesSel([])}
+                onChange={() => setMesesSel(todosSelecionados ? [] : [...MES_LABEL])}
                 className="w-3.5 h-3.5 accent-primary"
               />
               <span className="text-xs text-foreground font-semibold">{ano} · selecionar tudo</span>
@@ -203,7 +237,7 @@ function PeriodoPickerVG({ ano, setAno, anosDisponiveis, mesesSel, setMesesSel }
                 <label key={m} className="flex items-center gap-2 px-3 py-1 hover:bg-accent cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={todosSelecionados || mesesSel.includes(m)}
+                    checked={mesesSel.includes(m)}
                     onChange={() => toggleMesLocal(m)}
                     className="w-3.5 h-3.5 accent-primary"
                   />
@@ -228,17 +262,143 @@ function PeriodoPickerVG({ ano, setAno, anosDisponiveis, mesesSel, setMesesSel }
   )
 }
 
+// ─── Detalhamento de Vendas: cliente → produto (mesmo padrão visual/interação da
+// tela Histórico Clientes, adaptado aos filtros da Visão Global) ──────────────────
+function ProdutoRow({ p, isSelected, isDimmed, onClick }: {
+  p: VisaoGlobalClienteProdutoItem; isSelected: boolean; isDimmed: boolean; onClick: () => void
+}) {
+  return (
+    <tr
+      onClick={onClick}
+      className={`border-b border-slate-800/40 cursor-pointer select-none transition-all ${
+        isSelected ? 'bg-violet-900/40' : 'hover:bg-slate-800/30'
+      } ${isDimmed ? 'opacity-30' : ''}`}
+    >
+      <td className={`py-1.5 pr-4 ${isSelected ? 'text-violet-300' : 'text-slate-400'}`}>{p.codProduto}</td>
+      <td className={`py-1.5 pr-4 font-medium max-w-[220px] truncate ${isSelected ? 'text-violet-200' : 'text-foreground'}`}>{p.nomeProduto}</td>
+      <td className="py-1.5 pr-4 text-right text-slate-300 whitespace-nowrap">{formatNumber(p.volume, 2)}</td>
+      <td className="py-1.5 pr-4 text-right text-slate-300 whitespace-nowrap">{formatNumber(p.valor, 2)}</td>
+      <td className="py-1.5 pr-4 text-right text-slate-300">{formatCurrencyExato(p.precoMedio)}</td>
+      <td className="py-1.5 text-right text-slate-400">{p.dtUltimaCompra ? formatData(p.dtUltimaCompra) : '—'}</td>
+    </tr>
+  )
+}
+
+function ClienteRow({ c, rank, filtros, isExpanded, onToggle, dimmed, selectedProdutoCode, onProdutoClick }: {
+  c: VisaoGlobalClienteItem; rank: number; filtros: VisaoGlobalFiltros
+  isExpanded: boolean; onToggle: () => void; dimmed: boolean
+  selectedProdutoCode: string | null; onProdutoClick: (code: string) => void
+}) {
+  const { data: produtos, isLoading: prodLoading } = useQuery({
+    queryKey: ['visao-global-cliente-produtos', c.codParc, filtros],
+    queryFn: () => getVisaoGlobalClienteProdutos(c.codParc, filtros),
+    enabled: isExpanded,
+    staleTime: 60_000,
+  })
+
+  return (
+    <>
+      <tr
+        onClick={onToggle}
+        className={`border-b border-slate-700/30 cursor-pointer select-none transition-all ${
+          isExpanded ? 'bg-green-950/30' : 'hover:bg-slate-700/20'
+        } ${dimmed ? 'opacity-30' : ''}`}
+      >
+        <td className="px-3 py-1.5 text-slate-500">{rank}</td>
+        <td className="px-3 py-1.5">
+          <div className="flex items-center gap-2">
+            <ChevronRight className={`w-3 h-3 shrink-0 transition-transform duration-150 ${isExpanded ? 'rotate-90 text-green-400' : 'text-slate-500'}`} />
+            <div>
+              <p className="font-medium text-foreground truncate max-w-[240px]">{c.razaoSocial}</p>
+              <p className="text-[10px] text-slate-500">{c.codParc}</p>
+            </div>
+          </div>
+        </td>
+        <td className="px-2 py-1.5 text-right text-slate-300 whitespace-nowrap">{formatNumber(c.valor, 2)}</td>
+        <td className="px-2 py-1.5 text-right text-slate-400">{formatNumber(c.pctValor, 1)}%</td>
+        <td className="px-2 py-1.5 text-right text-slate-300 whitespace-nowrap">{formatNumber(c.volume, 2)}</td>
+        <td className="px-2 py-1.5 text-right text-slate-400">{formatNumber(c.pctVolume, 1)}%</td>
+        <td className="px-2 py-1.5 text-right text-slate-300">{formatCurrencyExato(c.precoMedio)}</td>
+        <td className="px-2 py-1.5 text-right text-slate-300">{c.qtdProdutos}</td>
+        <td className="px-2 py-1.5 text-right text-slate-400 whitespace-nowrap">{c.ultimaCompra ? formatData(c.ultimaCompra) : '—'}</td>
+      </tr>
+      <tr>
+        <td colSpan={9} className="p-0">
+          <div className={`overflow-hidden transition-all duration-200 ease-in-out ${isExpanded ? 'max-h-[600px]' : 'max-h-0'}`}>
+            <div className="bg-slate-900/50 border-b border-slate-600/50 px-10 py-3">
+              {isExpanded && prodLoading && (
+                <div className="flex items-center gap-2 text-slate-400 text-xs py-2">
+                  <div className="w-3 h-3 border border-green-500 border-t-transparent rounded-full animate-spin" />
+                  Carregando produtos...
+                </div>
+              )}
+              {isExpanded && !prodLoading && !produtos?.length && (
+                <p className="text-slate-500 text-xs py-2">Nenhum produto encontrado.</p>
+              )}
+              {isExpanded && !prodLoading && !!produtos?.length && (
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-700/60">
+                      <th className="text-left pb-1.5 pr-4 font-medium text-slate-500 w-20">Código</th>
+                      <th className="text-left pb-1.5 pr-4 font-medium text-slate-500">Produto</th>
+                      <th className="text-right pb-1.5 pr-4 font-medium text-slate-500">Volume (KG)</th>
+                      <th className="text-right pb-1.5 pr-4 font-medium text-slate-500">Faturamento</th>
+                      <th className="text-right pb-1.5 pr-4 font-medium text-slate-500">R$/kg</th>
+                      <th className="text-right pb-1.5 font-medium text-slate-500">Última Compra</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {produtos.map(p => (
+                      <ProdutoRow
+                        key={p.codProduto}
+                        p={p}
+                        isSelected={selectedProdutoCode === p.codProduto}
+                        isDimmed={!!selectedProdutoCode && selectedProdutoCode !== p.codProduto}
+                        onClick={() => onProdutoClick(p.codProduto)}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </td>
+      </tr>
+    </>
+  )
+}
+
 export default function VisaoGlobal() {
   const [ano, setAno] = useState(2026)
-  const [mesesSel, setMesesSel] = useState<string[]>([])
+  const [mesesSel, setMesesSel] = useState<string[]>([...MES_LABEL])
   const [gruposSel, setGruposSel] = useState<string[]>([])
   const [tipoReceitaSel, setTipoReceitaSel] = useState<VisaoGlobalTipoReceita | null>(null)
+  // Filtro dropdown de tipo (seleção múltipla) — independente dos 3 cards clicáveis
+  // (seleção única) logo abaixo; os dois controles coexistem e o que vale pro
+  // backend é a união dos dois (ver `tiposReceitaEfetivos`).
+  const [tipoMultiSel, setTipoMultiSel] = useState<VisaoGlobalTipoReceita[]>([])
   const [mercadosSel, setMercadosSel] = useState<string[]>([])
   const [projetosSel, setProjetosSel] = useState<string[]>([])
+  // Detalhamento de Vendas — 1 cliente expandido por vez; produto clicado dentro
+  // da expansão só esmaece as outras linhas (realce visual, sem filtrar a tabela).
+  const [expandedParc, setExpandedParc] = useState<number | null>(null)
+  const [selectedProdutoCode, setSelectedProdutoCode] = useState<string | null>(null)
+  function toggleClienteDetalhe(codParc: number) {
+    setExpandedParc(prev => (prev === codParc ? null : codParc))
+    setSelectedProdutoCode(null)
+  }
+  function handleProdutoClick(code: string) {
+    setSelectedProdutoCode(prev => (prev === code ? null : code))
+  }
 
   function toggleTipoReceita(tipo: VisaoGlobalTipoReceita) {
     setTipoReceitaSel(prev => (prev === tipo ? null : tipo))
   }
+
+  const tiposReceitaEfetivos = useMemo(
+    () => Array.from(new Set([...(tipoReceitaSel ? [tipoReceitaSel] : []), ...tipoMultiSel])),
+    [tipoReceitaSel, tipoMultiSel]
+  )
   // Clique numa linha de mercado na tabela — soma/remove esse mercado da seleção
   // múltipla (mesmo estado do filtro "Todos os mercados" acima).
   function toggleMercado(mercado: string) {
@@ -248,7 +408,7 @@ export default function VisaoGlobal() {
   // seletor de período), sempre substituindo por um único mês.
   // Clicar de novo no mesmo mês limpa o filtro.
   function toggleMes(mesLabel: string) {
-    setMesesSel(prev => (prev.length === 1 && prev[0] === mesLabel ? [] : [mesLabel]))
+    setMesesSel(prev => (prev.length === 1 && prev[0] === mesLabel ? [...MES_LABEL] : [mesLabel]))
   }
 
   const { data: disponiveis } = useQuery({
@@ -257,20 +417,52 @@ export default function VisaoGlobal() {
     staleTime: 5 * 60_000,
   })
 
+  // Filtros "de tela" — usados pela barra de filtros e pela própria tabela de
+  // Detalhamento de Vendas (que precisa continuar navegável, listando todos os
+  // clientes, mesmo quando um deles está expandido/selecionado).
   const filtros: VisaoGlobalFiltros = useMemo(() => ({
     ano,
     meses: mesesSel.map(m => MES_LABEL.indexOf(m) + 1).filter(n => n > 0),
     gruposProduto: gruposSel,
-    tipoReceita: tipoReceitaSel ?? undefined,
+    tipoReceita: tiposReceitaEfetivos,
     mercados: mercadosSel,
     projetos: projetosSel,
-  }), [ano, mesesSel, gruposSel, tipoReceitaSel, mercadosSel, projetosSel])
+  }), [ano, mesesSel, gruposSel, tiposReceitaEfetivos, mercadosSel, projetosSel])
+
+  // Filtros "escopados" — os mesmos + cliente/produto selecionado no Detalhamento de
+  // Vendas, se houver. Usados pelo resumo (KPIs/gráfico/tabela de mercado), que
+  // devem realçar o que estiver selecionado; a tabela de clientes em si usa `filtros`
+  // (acima), sem escopo, pra não se auto-filtrar a uma linha só.
+  const filtrosEscopo: VisaoGlobalFiltros = useMemo(() => ({
+    ...filtros,
+    ...(expandedParc != null ? { codParcs: [expandedParc] } : {}),
+    ...(selectedProdutoCode != null ? { codProdutos: [Number(selectedProdutoCode)] } : {}),
+  }), [filtros, expandedParc, selectedProdutoCode])
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['visao-global-resumo', filtros],
-    queryFn: () => getVisaoGlobalResumo(filtros),
+    queryKey: ['visao-global-resumo', filtrosEscopo],
+    queryFn: () => getVisaoGlobalResumo(filtrosEscopo),
     staleTime: 60_000,
   })
+
+  // Mesmos filtros (já escopados), ano anterior — só pra calcular a variação % dos
+  // cards "Previsão Total" e "Realizado KG" (ver YoYBadge). Reaproveita o mesmo
+  // endpoint/resumo, sem nenhuma mudança de backend.
+  const filtrosAnoAnterior: VisaoGlobalFiltros = useMemo(() => ({ ...filtrosEscopo, ano: ano - 1 }), [filtrosEscopo, ano])
+  const { data: dataAnoAnterior } = useQuery({
+    queryKey: ['visao-global-resumo', filtrosAnoAnterior],
+    queryFn: () => getVisaoGlobalResumo(filtrosAnoAnterior),
+    staleTime: 60_000,
+  })
+
+  // Detalhamento de Vendas — mesmos `filtros` da tela inteira, então qualquer
+  // filtro (ano/mês/mercado/projeto/grupo/tipo) já reflete aqui automaticamente.
+  const { data: clientesDetalhe, isLoading: clientesDetalheLoading } = useQuery({
+    queryKey: ['visao-global-clientes', filtros],
+    queryFn: () => getVisaoGlobalClientes(filtros),
+    staleTime: 60_000,
+  })
+  const clienteSelecionado = expandedParc != null ? clientesDetalhe?.find(c => c.codParc === expandedParc) : undefined
 
   const anosDisponiveis = disponiveis?.anos?.length ? disponiveis.anos : [2026]
   const grupoOptions = disponiveis?.grupos ?? []
@@ -330,18 +522,22 @@ export default function VisaoGlobal() {
   // diferente do clicado está selecionado — combina os dois filtros no mesmo
   // realce visual, sem afetar o cálculo em si (isso já é feito no backend).
   function opacidadeBarra(tipo: VisaoGlobalTipoReceita, mesLabel: string): number {
-    const tipoOk = !tipoReceitaSel || tipoReceitaSel === tipo
-    const mesOk = mesesSel.length === 0 || mesesSel.includes(mesLabel)
+    const tipoOk = tiposReceitaEfetivos.length === 0 || tiposReceitaEfetivos.includes(tipo)
+    const mesOk = mesesSel.includes(mesLabel)
     return tipoOk && mesOk ? 1 : 0.2
   }
 
   const kpis = data?.kpis
-  // "Previsão Total" = soma dos 3 grupos de receita (Vendas Firmes + Novos Projetos
-  // + Forecast), sempre — independe do card de tipo selecionado, ao contrário do
-  // card "Desvio R$"/"Atingimento" (esses continuam refletindo o Realizado filtrado).
-  const previsaoTotalRS = kpis
-    ? (kpis.vendaFirmeTotalRS ?? 0) + (kpis.novoProjetoTotalRS ?? 0) + (kpis.forecastTotalRS ?? 0)
-    : null
+  // "Previsão Total" = soma dos tipos selecionados (cards + dropdown de Tipo) — todos
+  // os 3 (Vendas Firmes + Novos Projetos + Forecast) sem seleção. Vem pronto do
+  // backend (kpis.previsaoTotalRS), que é a mesma base usada por Desvio R$/
+  // Atingimento/Realizado KG — não recalcular aqui pra não divergir do filtro.
+  const previsaoTotalRS = kpis?.previsaoTotalRS ?? null
+
+  // Mesma conta, ano anterior — só pros badges de variação (YoYBadge) dos cards
+  // "Previsão Total" e "Realizado KG".
+  const kpisAnoAnterior = dataAnoAnterior?.kpis
+  const previsaoTotalRSAnoAnterior = kpisAnoAnterior?.previsaoTotalRS ?? null
 
   return (
     <div className="space-y-4">
@@ -371,17 +567,17 @@ export default function VisaoGlobal() {
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Filtros</span>
           <span className="text-xs text-muted-foreground/50">· Ano / Mês</span>
           <span className="ml-1 px-2 py-0.5 rounded-full bg-primary/15 text-primary text-[11px] font-medium">
-            {mesesSel.length === 0
+            {mesesSel.length === MES_LABEL.length
               ? `Ano ${ano}`
               : mesesSel.length <= 3
                 ? mesesSel.map(m => `${m}/${String(ano).slice(2)}`).join(' + ')
                 : `${mesesSel.length} meses selecionados`}
           </span>
-          {(mesesSel.length > 0 || gruposSel.length > 0 || tipoReceitaSel || mercadosSel.length > 0 || projetosSel.length > 0) && (
+          {((mesesSel.length > 0 && mesesSel.length < MES_LABEL.length) || gruposSel.length > 0 || tipoReceitaSel || tipoMultiSel.length > 0 || mercadosSel.length > 0 || projetosSel.length > 0) && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => { setMesesSel([]); setGruposSel([]); setTipoReceitaSel(null); setMercadosSel([]); setProjetosSel([]) }}
+              onClick={() => { setMesesSel([...MES_LABEL]); setGruposSel([]); setTipoReceitaSel(null); setTipoMultiSel([]); setMercadosSel([]); setProjetosSel([]) }}
               className="ml-auto h-6 text-xs text-muted-foreground hover:text-foreground gap-1 px-2"
             >
               <X className="w-3 h-3" />
@@ -392,6 +588,13 @@ export default function VisaoGlobal() {
 
         {/* Row 1: Multi-selects */}
         <div className="flex items-center gap-2 flex-wrap">
+          <MultiSelect
+            options={TIPO_RECEITA_DROPDOWN_OPTIONS}
+            selected={tipoMultiSel.map(t => TIPO_RECEITA_DROPDOWN_LABEL[t])}
+            onChange={(labels) => setTipoMultiSel(labels.map(l => TIPO_RECEITA_POR_LABEL[l]).filter(Boolean))}
+            placeholder="Todos os tipos"
+            className="flex-1 min-w-[130px] max-w-[180px]"
+          />
           <MultiSelect options={mercadoOptions} selected={mercadosSel} onChange={setMercadosSel} placeholder="Todos os mercados" className="flex-1 min-w-[150px] max-w-[220px]" />
           <MultiSelect options={projetoOptions} selected={projetosSel} onChange={setProjetosSel} placeholder="Todos os projetos" className="flex-1 min-w-[150px] max-w-[220px]" />
           <MultiSelect options={grupoOptions} selected={gruposSel} onChange={setGruposSel} placeholder="Todos os grupos" className="flex-1 min-w-[140px] max-w-[200px]" />
@@ -401,7 +604,7 @@ export default function VisaoGlobal() {
         <div className="flex items-center gap-2 flex-wrap">
           <PeriodoPickerVG
             ano={ano}
-            setAno={(a) => { setAno(a); setMesesSel([]) }}
+            setAno={(a) => { setAno(a); setMesesSel([...MES_LABEL]) }}
             anosDisponiveis={anosDisponiveis}
             mesesSel={mesesSel}
             setMesesSel={setMesesSel}
@@ -439,6 +642,8 @@ export default function VisaoGlobal() {
           tooltip={previsaoTotalRS != null ? `${formatCurrencyExato(previsaoTotalRS)} (Vendas Firmes + Novos Projetos + Forecast)` : 'Base de realizado não carregada'}
           icon={DollarSign}
           colorClass="border-l-[#4F9D6E]"
+          atual={previsaoTotalRS ?? undefined}
+          anterior={previsaoTotalRSAnoAnterior}
         />
         <KpiCard
           label="Desvio R$"
@@ -459,6 +664,8 @@ export default function VisaoGlobal() {
           value={kpis?.realizadoKG != null ? formatKg(kpis.realizadoKG) : '—'}
           icon={Package}
           colorClass="border-l-[#4F9D6E]"
+          atual={kpis?.realizadoKG ?? undefined}
+          anterior={kpisAnoAnterior?.realizadoKG}
         />
       </div>
 
@@ -616,6 +823,64 @@ export default function VisaoGlobal() {
             <Line dataKey={chartConfig.orcamentoKey} name="Orçamento" stroke={COLORS.ORCAMENTO} strokeWidth={2} strokeDasharray="6 4" dot={{ r: 3 }} />
           </ComposedChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* Detalhamento de Vendas — clientes (→ produtos, expansível), respeitando
+          todos os filtros ativos da tela (mesmo `filtros` do gráfico/tabela acima). */}
+      <div className="bg-slate-800 border border-slate-700 rounded-xl px-5 py-4">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+          <p className="text-sm font-semibold text-foreground">
+            Detalhamento de Vendas
+            <span className="text-[10px] text-muted-foreground font-normal ml-2">
+              {clientesDetalhe ? `${clientesDetalhe.length} clientes` : ''}
+            </span>
+          </p>
+          {expandedParc != null && (
+            <span className="text-[11px] bg-green-900/40 text-green-400 border border-green-700/50 px-2 py-0.5 rounded-full flex items-center gap-1">
+              Filtrando a tela por {clienteSelecionado?.razaoSocial ?? `cliente ${expandedParc}`}
+              {selectedProdutoCode && ` · produto ${selectedProdutoCode}`}
+              <button onClick={() => toggleClienteDetalhe(expandedParc)} className="hover:text-foreground"><X className="w-3 h-3" /></button>
+            </span>
+          )}
+        </div>
+        <div className="overflow-auto max-h-[560px] border border-slate-700/60 rounded-lg">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-slate-800 z-10">
+              <tr className="border-b border-slate-700">
+                <th className="px-3 py-2 text-left font-medium text-slate-400">#</th>
+                <th className="px-3 py-2 text-left font-medium text-slate-400">Cliente</th>
+                <th className="px-2 py-2 text-right font-medium text-slate-400">Fat.</th>
+                <th className="px-2 py-2 text-right font-medium text-slate-400">% Fat</th>
+                <th className="px-2 py-2 text-right font-medium text-slate-400">Vol.</th>
+                <th className="px-2 py-2 text-right font-medium text-slate-400">% Vol</th>
+                <th className="px-2 py-2 text-right font-medium text-slate-400">R$/kg</th>
+                <th className="px-2 py-2 text-right font-medium text-slate-400">Prod</th>
+                <th className="px-2 py-2 text-right font-medium text-slate-400">Última Compra</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clientesDetalheLoading && (
+                <tr><td colSpan={9} className="text-center text-muted-foreground py-8">Carregando...</td></tr>
+              )}
+              {!clientesDetalheLoading && !clientesDetalhe?.length && (
+                <tr><td colSpan={9} className="text-center text-muted-foreground py-8">Sem dados para os filtros selecionados</td></tr>
+              )}
+              {!clientesDetalheLoading && (clientesDetalhe ?? []).map((c, i) => (
+                <ClienteRow
+                  key={c.codParc}
+                  c={c}
+                  rank={i + 1}
+                  filtros={filtros}
+                  isExpanded={expandedParc === c.codParc}
+                  onToggle={() => toggleClienteDetalhe(c.codParc)}
+                  dimmed={expandedParc !== null && expandedParc !== c.codParc}
+                  selectedProdutoCode={expandedParc === c.codParc ? selectedProdutoCode : null}
+                  onProdutoClick={handleProdutoClick}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Diagnóstico — área de qualidade de dados, discreta e recolhida por padrão */}

@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation } from 'wouter'
-import { Bell, Check, ClipboardList, AlertTriangle } from 'lucide-react'
+import { Bell, Check, ClipboardList, AlertTriangle, RefreshCw } from 'lucide-react'
 import { getNotificacoes, marcarNotificacaoLida, marcarTodasNotificacoesLidas, type ApiNotificacao, type NotificacaoTipo } from '../lib/api'
 
 const ICONE_POR_TIPO: Record<NotificacaoTipo, { Icon: typeof Bell; className: string }> = {
   TAREFA_ATRIBUIDA: { Icon: ClipboardList, className: 'text-green-400' },
   TAREFA_REATRIBUIDA: { Icon: ClipboardList, className: 'text-blue-400' },
   TAREFA_VENCIDA: { Icon: AlertTriangle, className: 'text-red-400' },
+  SYNC_BITRIX_ATRASADO: { Icon: RefreshCw, className: 'text-amber-400' },
 }
 
 // Timestamp vem do backend em UTC sem sufixo de fuso — mesmo ajuste já usado em
@@ -47,7 +48,7 @@ export default function NotificacoesBell({ collapsed = false, dropdownAlign = 't
         // Navega mesmo se marcar como lida falhar — não é bloqueante.
       }
     }
-    navigate(`/tarefas?taskId=${n.taskId}`)
+    if (n.taskId != null) navigate(`/tarefas?taskId=${n.taskId}`)
   }
 
   async function marcarTodas() {
